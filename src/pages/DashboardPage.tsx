@@ -36,8 +36,8 @@ export default function DashboardPage() {
                 <Chip label={admin?.role ?? ''} color="primary" />
               </Stack>
               <Typography variant="body2" color="text.secondary">
-                You are signed in with a valid JWT. Product and order management
-                are coming in the next steps.
+                You are signed in with a valid JWT. Use the sidebar to manage
+                products and orders.
               </Typography>
             </Stack>
           )}
