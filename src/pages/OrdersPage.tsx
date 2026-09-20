@@ -48,6 +48,7 @@ export default function OrdersPage() {
     onSuccess: () => {
       setError('')
       queryClient.invalidateQueries({ queryKey: ['orders'] })
+      queryClient.invalidateQueries({ queryKey: ['products'] })
     },
     onError: (err) => {
       if (axios.isAxiosError(err)) {
