@@ -13,7 +13,9 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
+import PrintIcon from '@mui/icons-material/Print'
 import type { Order, OrderStatus } from '@/types'
+import { printOrderSlip } from '@/utils/orderExport'
 import { formatDate, formatPrice } from '@/utils/format'
 
 const statusColor: Record<OrderStatus, 'warning' | 'info' | 'primary' | 'success' | 'error'> = {
@@ -143,6 +145,9 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
         </Stack>
       </DialogContent>
       <DialogActions>
+        <Button startIcon={<PrintIcon />} onClick={() => printOrderSlip(order)}>
+          Print slip
+        </Button>
         <Button onClick={onClose}>Close</Button>
       </DialogActions>
     </Dialog>

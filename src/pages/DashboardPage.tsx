@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import {
   Alert,
   Card,
@@ -6,6 +7,9 @@ import {
   Chip,
   CircularProgress,
   Grid,
+  List,
+  ListItemButton,
+  ListItemText,
   Paper,
   Skeleton,
   Stack,
@@ -17,6 +21,7 @@ import { productsApi } from '@/api/products'
 import { formatPrice } from '@/utils/format'
 
 export default function DashboardPage() {
+  const navigate = useNavigate()
   const { data: admin, isLoading: adminLoading, isError: adminError } = useQuery({
     queryKey: ['me'],
     queryFn: authApi.me,
@@ -36,7 +41,10 @@ export default function DashboardPage() {
   const totalOrders = orders?.length ?? 0
   const totalRevenue = orders?.reduce((sum, order) => sum + order.total, 0) ?? 0
   const totalProducts = products?.length ?? 0
-  const lowStockProducts = products?.filter(p => p.stock < 6).length ?? 0
+  const lowStockList = (products ?? [])
+    .filter(p => p.stock < 6)
+    .sort((a, b) => a.stock - b.stock)
+  const lowStockProducts = lowStockList.length
 
   const ordersByStatus = {
     Pending: orders?.filter(o => o.status === 'Pending').length ?? 0,
@@ -133,6 +141,34 @@ export default function DashboardPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      {/* Low stock list */}
+      {lowStockProducts > 0 && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Running low on stock
+            </Typography>
+            <List dense disablePadding>
+              {lowStockList.slice(0, 8).map((product) => (
+                <ListItemButton key={product._id} onClick={() => navigate(`/products/${product.slug}/edit`)}>
+                  <ListItemText primary={product.name} secondary={product.slug} />
+                  <Chip
+                    size="small"
+                    label={product.stock === 0 ? 'Out of stock' : `${product.stock} left`}
+                    color={product.stock === 0 ? 'error' : 'warning'}
+                  />
+                </ListItemButton>
+              ))}
+            </List>
+            {lowStockProducts > 8 && (
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                and {lowStockProducts - 8} more on the Products page
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Orders by Status */}
       <Card>

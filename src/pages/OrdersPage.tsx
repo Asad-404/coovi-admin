@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import axios from 'axios'
 import {
   Alert,
+  Button,
   Chip,
   CircularProgress,
   IconButton,
@@ -21,11 +22,13 @@ import {
   Typography,
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import DownloadIcon from '@mui/icons-material/Download'
 import type { ChipProps } from '@mui/material'
 import { ordersApi } from '@/api/orders'
 import { formatDate, formatPrice } from '@/utils/format'
 import type { Order, OrderStatus } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
+import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 
 const STATUSES: OrderStatus[] = ['Pending', 'Processing', 'Shipped', 'Delivered', 'Cancelled']
 
@@ -86,7 +89,19 @@ export default function OrdersPage() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h4">Orders</Typography>
+      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h4">Orders</Typography>
+        <Button
+          variant="outlined"
+          startIcon={<DownloadIcon />}
+          disabled={!filteredOrders?.length}
+          onClick={() =>
+            downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
+          }
+        >
+          Export CSV
+        </Button>
+      </Stack>
 
       {error && <Alert severity="error">{error}</Alert>}
 

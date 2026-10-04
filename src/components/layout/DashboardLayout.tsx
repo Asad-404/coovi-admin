@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import {
   AppBar,
@@ -16,6 +17,8 @@ import DashboardIcon from '@mui/icons-material/Dashboard'
 import Inventory2Icon from '@mui/icons-material/Inventory2'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import LogoutIcon from '@mui/icons-material/Logout'
+import LockResetIcon from '@mui/icons-material/LockReset'
+import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 
 const drawerWidth = 240
 
@@ -28,6 +31,7 @@ const navItems = [
 export default function DashboardLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const [passwordOpen, setPasswordOpen] = useState(false)
 
   const logout = () => {
     localStorage.removeItem('admin_token')
@@ -44,6 +48,9 @@ export default function DashboardLayout() {
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Coovi Admin
           </Typography>
+          <Button color="inherit" startIcon={<LockResetIcon />} onClick={() => setPasswordOpen(true)}>
+            Password
+          </Button>
           <Button color="inherit" startIcon={<LogoutIcon />} onClick={logout}>
             Logout
           </Button>
@@ -76,6 +83,8 @@ export default function DashboardLayout() {
           ))}
         </List>
       </Drawer>
+
+      <ChangePasswordDialog open={passwordOpen} onClose={() => setPasswordOpen(false)} />
 
       <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
         <Toolbar />
