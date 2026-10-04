@@ -10,6 +10,7 @@ export interface Product {
   description?: string
   descriptionBn?: string
   price: number
+  compareAtPrice?: number | null
   images: string[]
   size?: string
   category: string
