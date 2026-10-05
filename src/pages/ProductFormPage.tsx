@@ -25,6 +25,7 @@ interface ProductFormState {
   nameBn: string
   slug: string
   price: string
+  compareAtPrice: string
   stock: string
   category: string
   size: string
@@ -39,6 +40,7 @@ const emptyForm: ProductFormState = {
   nameBn: '',
   slug: '',
   price: '',
+  compareAtPrice: '',
   stock: '',
   category: 'Saree',
   size: 'Free Size',
@@ -53,6 +55,7 @@ const formFromProduct = (p: Product): ProductFormState => ({
   nameBn: p.nameBn ?? '',
   slug: p.slug,
   price: String(p.price),
+  compareAtPrice: p.compareAtPrice ? String(p.compareAtPrice) : '',
   stock: String(p.stock),
   category: p.category,
   size: p.size ?? '',
@@ -127,6 +130,7 @@ export default function ProductFormPage() {
 
     const price = Number(form.price)
     const stock = Number(form.stock)
+    const compareAtPrice = form.compareAtPrice === '' ? null : Number(form.compareAtPrice)
 
     if (!form.name || !form.slug) {
       setError('Name and slug are required')
@@ -134,6 +138,10 @@ export default function ProductFormPage() {
     }
     if (!Number.isFinite(price) || price <= 0) {
       setError('Price must be a number greater than 0')
+      return
+    }
+    if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice <= price)) {
+      setError('Original price must be higher than the price (or leave it empty for no sale)')
       return
     }
     if (!Number.isFinite(stock) || stock < 0) {
@@ -150,6 +158,7 @@ export default function ProductFormPage() {
       nameBn: form.nameBn || undefined,
       slug: form.slug,
       price,
+      compareAtPrice,
       stock,
       category: form.category || 'Saree',
       size: form.size || undefined,
@@ -228,7 +237,16 @@ export default function ProductFormPage() {
                 type="number"
                 value={form.price}
                 onChange={(e) => set('price', e.target.value)}
+                helperText="What the customer pays"
                 required
+                fullWidth
+              />
+              <TextField
+                label="Original price (BDT)"
+                type="number"
+                value={form.compareAtPrice}
+                onChange={(e) => set('compareAtPrice', e.target.value)}
+                helperText="Optional. Higher than the price puts the product On Sale"
                 fullWidth
               />
               <TextField

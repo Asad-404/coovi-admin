@@ -115,7 +115,17 @@ export default function ProductsPage() {
                       </Stack>
                     </Stack>
                   </TableCell>
-                  <TableCell>{formatPrice(product.price)}</TableCell>
+                  <TableCell>
+                    {formatPrice(product.price)}
+                    {product.compareAtPrice != null && product.compareAtPrice > product.price && (
+                      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                          {formatPrice(product.compareAtPrice)}
+                        </Typography>
+                        <Chip size="small" color="error" label="On sale" />
+                      </Stack>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Chip
                       size="small"

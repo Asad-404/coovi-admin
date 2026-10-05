@@ -13,4 +13,9 @@ export const authApi = {
     const res = await apiClient.get('/auth/me')
     return res.data.data
   },
+
+  // PATCH /auth/password -> { success, message }; needs the current password
+  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
+    await apiClient.patch('/auth/password', { currentPassword, newPassword })
+  },
 }
