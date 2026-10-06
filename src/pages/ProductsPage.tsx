@@ -197,11 +197,15 @@ export default function ProductsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
-                        label={`${product.stock} in stock`}
-                        color={product.stock === 0 ? 'error' : product.stock < LOW_STOCK_THRESHOLD ? 'warning' : 'success'}
-                      />
+                      <Stack direction="row" spacing={0.5}>
+                        <Chip
+                          size="small"
+                          label={`${product.stock} in stock`}
+                          color={product.stock === 0 ? 'error' : product.stock < LOW_STOCK_THRESHOLD ? 'warning' : 'success'}
+                        />
+                        {/* Switched off in the form: the shop shows it as out of stock and the API refuses orders */}
+                        {!product.inStock && <Chip size="small" variant="outlined" label="Not for sale" />}
+                      </Stack>
                     </TableCell>
                     <TableCell>{product.category}</TableCell>
                     <TableCell align="right">
