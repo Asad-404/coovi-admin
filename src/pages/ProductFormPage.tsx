@@ -303,7 +303,7 @@ function ProductForm({ product }: { product?: Product }) {
                     onChange={(e) => set('inStock', e.target.checked)}
                   />
                 }
-                label="In stock"
+                label="Available for sale"
               />
             </Stack>
 
