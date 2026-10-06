@@ -47,6 +47,9 @@ export interface Order {
   updatedAt: string
 }
 
+// Fields an admin may correct on an existing order
+export type OrderDetailsUpdate = Partial<Pick<Order, 'customerName' | 'phone' | 'address' | 'notes'>>
+
 export interface Admin {
   _id: string
   email: string

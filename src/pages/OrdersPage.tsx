@@ -46,7 +46,7 @@ export default function OrdersPage() {
   const notify = useNotify()
   const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState('')
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -76,8 +76,13 @@ export default function OrdersPage() {
     onError: (err) => {
       setCancelTarget(null)
       setError(getErrorMessage(err, 'Status update failed'))
+      // A 409 usually means the order changed elsewhere — show its current state
+      queryClient.invalidateQueries({ queryKey: ['orders'] })
     },
   })
+
+  // Looked up from the list so the details window shows fresh data after an edit
+  const selectedOrder = orders?.find((o) => o._id === selectedId) ?? null
 
   // Only the row being saved is locked, the rest of the table stays usable
   const savingId = statusMutation.isPending ? statusMutation.variables?.id : undefined
@@ -252,7 +257,7 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell>
                         <Tooltip title="View Details">
-                          <IconButton onClick={() => setSelectedOrder(order)} size="small" aria-label={`View ${order.orderNumber}`}>
+                          <IconButton onClick={() => setSelectedId(order._id)} size="small" aria-label={`View ${order.orderNumber}`}>
                             <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
@@ -312,7 +317,7 @@ export default function OrdersPage() {
       <OrderDetailModal
         order={selectedOrder}
         open={Boolean(selectedOrder)}
-        onClose={() => setSelectedOrder(null)}
+        onClose={() => setSelectedId(null)}
       />
     </Stack>
   )
