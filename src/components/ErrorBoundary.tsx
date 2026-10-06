@@ -33,7 +33,7 @@ export default class ErrorBoundary extends Component<Props, State> {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: 'grey.100',
+            bgcolor: 'background.default',
             p: 2,
           }}
         >
