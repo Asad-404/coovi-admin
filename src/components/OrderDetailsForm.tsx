@@ -55,7 +55,15 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
     <Stack spacing={2} component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
       {error && <Alert severity="error">{error}</Alert>}
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-        <TextField label="Name" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required fullWidth size="small" />
+        <TextField
+          label="Name"
+          value={customerName}
+          onChange={(e) => setCustomerName(e.target.value)}
+          required
+          fullWidth
+          size="small"
+          slotProps={{ htmlInput: { maxLength: 100 } }}
+        />
         <TextField
           label="Phone"
           value={phone}
@@ -66,7 +74,16 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
           slotProps={{ htmlInput: { inputMode: 'numeric' } }}
         />
       </Stack>
-      <TextField label="Address" value={address} onChange={(e) => setAddress(e.target.value)} required multiline minRows={2} size="small" />
+      <TextField
+        label="Address"
+        value={address}
+        onChange={(e) => setAddress(e.target.value)}
+        required
+        multiline
+        minRows={2}
+        size="small"
+        slotProps={{ htmlInput: { maxLength: 500 } }}
+      />
       <TextField
         label="Notes"
         value={notes}

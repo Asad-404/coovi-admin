@@ -67,6 +67,20 @@ const formFromProduct = (p: Product): ProductFormState => ({
   imagesText: p.images.join('\n'),
 })
 
+const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
+
+const isHttpUrl = (value: string): boolean => {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+// Length limits from the API's product schema
+const maxLength = (n: number) => ({ htmlInput: { maxLength: n } })
+
 const parseImages = (text: string): string[] =>
   text
     .split('\n')
@@ -141,24 +155,34 @@ function ProductForm({ product }: { product?: Product }) {
     const stock = Number(form.stock)
     const compareAtPrice = form.compareAtPrice === '' ? null : Number(form.compareAtPrice)
 
+    // Same rules as the API's product schema, checked here for a friendlier message
     if (!form.name || !form.slug) {
       setError('Name and slug are required')
       return
     }
-    if (!Number.isFinite(price) || price <= 0) {
-      setError('Price must be a number greater than 0')
+    if (!SLUG_PATTERN.test(form.slug)) {
+      setError('Slug must be lowercase letters and numbers joined by single hyphens, e.g. red-silk-saree')
       return
     }
-    if (compareAtPrice !== null && (!Number.isFinite(compareAtPrice) || compareAtPrice <= price)) {
-      setError('Original price must be higher than the price (or leave it empty for no sale)')
+    if (!Number.isInteger(price) || price <= 0) {
+      setError('Price must be a whole number of taka greater than 0')
       return
     }
-    if (!Number.isFinite(stock) || stock < 0) {
-      setError('Stock must be 0 or more')
+    if (compareAtPrice !== null && (!Number.isInteger(compareAtPrice) || compareAtPrice <= price)) {
+      setError('Original price must be a whole number higher than the price (or leave it empty for no sale)')
+      return
+    }
+    if (!Number.isInteger(stock) || stock < 0) {
+      setError('Stock must be a whole number, 0 or more')
       return
     }
     if (images.length === 0) {
       setError('At least one image URL is required')
+      return
+    }
+    const badImage = images.find((url) => !isHttpUrl(url))
+    if (badImage) {
+      setError(`Not a valid image URL: ${badImage}`)
       return
     }
 
@@ -199,6 +223,7 @@ function ProductForm({ product }: { product?: Product }) {
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
               <TextField
                 label="Name (English)"
+                slotProps={maxLength(120)}
                 value={form.name}
                 onChange={(e) => handleNameChange(e.target.value)}
                 required
@@ -206,6 +231,7 @@ function ProductForm({ product }: { product?: Product }) {
               />
               <TextField
                 label="Name (Bengali)"
+                slotProps={maxLength(120)}
                 value={form.nameBn}
                 onChange={(e) => set('nameBn', e.target.value)}
                 fullWidth
@@ -215,6 +241,7 @@ function ProductForm({ product }: { product?: Product }) {
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
               <TextField
                 label="Slug (URL part)"
+                slotProps={maxLength(100)}
                 value={form.slug}
                 onChange={(e) => {
                   setSlugEdited(true)
@@ -226,12 +253,14 @@ function ProductForm({ product }: { product?: Product }) {
               />
               <TextField
                 label="Category"
+                slotProps={maxLength(50)}
                 value={form.category}
                 onChange={(e) => set('category', e.target.value)}
                 fullWidth
               />
               <TextField
                 label="Size"
+                slotProps={maxLength(50)}
                 value={form.size}
                 onChange={(e) => set('size', e.target.value)}
                 fullWidth
@@ -241,6 +270,7 @@ function ProductForm({ product }: { product?: Product }) {
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
               <TextField
                 label="Price (BDT)"
+                slotProps={{ htmlInput: { min: 0, step: 1 } }}
                 type="number"
                 value={form.price}
                 onChange={(e) => set('price', e.target.value)}
@@ -250,6 +280,7 @@ function ProductForm({ product }: { product?: Product }) {
               />
               <TextField
                 label="Original price (BDT)"
+                slotProps={{ htmlInput: { min: 0, step: 1 } }}
                 type="number"
                 value={form.compareAtPrice}
                 onChange={(e) => set('compareAtPrice', e.target.value)}
@@ -258,6 +289,7 @@ function ProductForm({ product }: { product?: Product }) {
               />
               <TextField
                 label="Stock"
+                slotProps={{ htmlInput: { min: 0, step: 1 } }}
                 type="number"
                 value={form.stock}
                 onChange={(e) => set('stock', e.target.value)}
@@ -300,6 +332,7 @@ function ProductForm({ product }: { product?: Product }) {
 
             <TextField
               label="Description (English)"
+              slotProps={maxLength(2000)}
               value={form.description}
               onChange={(e) => set('description', e.target.value)}
               multiline
@@ -308,6 +341,7 @@ function ProductForm({ product }: { product?: Product }) {
             />
             <TextField
               label="Description (Bengali)"
+              slotProps={maxLength(2000)}
               value={form.descriptionBn}
               onChange={(e) => set('descriptionBn', e.target.value)}
               multiline
