@@ -10,10 +10,11 @@ pnpm install
 pnpm dev
 pnpm build
 pnpm lint
+pnpm test
 pnpm preview
 ```
 
-Do not start these commands automatically; the workspace owner runs the admin app and verification manually.
+Claude may run these commands to install dependencies, build, lint, and start the dev/preview server to check changes. Run `pnpm build`, `pnpm lint` and `pnpm test` before committing.
 
 ## Architecture
 

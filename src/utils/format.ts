@@ -14,3 +14,5 @@ export const slugify = (text: string): string =>
     .trim()
     .replace(/[^a-z0-9\s-]/g, '')
     .replace(/[\s-]+/g, '-')
+    // The API requires words joined by single hyphens, with none at either end
+    .replace(/^-+|-+$/g, '')

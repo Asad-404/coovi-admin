@@ -6,6 +6,7 @@ import { ThemeProvider } from '@mui/material/styles'
 import CssBaseline from '@mui/material/CssBaseline'
 import App from './App.tsx'
 import theme from '@/theme/theme.ts'
+import NotifyProvider from '@/notify/NotifyProvider'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -23,7 +24,9 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <ThemeProvider theme={theme}>
           <CssBaseline />
-          <App />
+          <NotifyProvider>
+            <App />
+          </NotifyProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>

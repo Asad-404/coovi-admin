@@ -13,18 +13,14 @@ import {
   TableRow,
   Typography,
 } from '@mui/material'
+import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
-import type { Order, OrderStatus } from '@/types'
+import EditIcon from '@mui/icons-material/Edit'
+import OrderDetailsForm from '@/components/OrderDetailsForm'
+import type { Order } from '@/types'
+import { statusColor } from '@/utils/orderStatus'
 import { printOrderSlip } from '@/utils/orderExport'
 import { formatDate, formatPrice } from '@/utils/format'
-
-const statusColor: Record<OrderStatus, 'warning' | 'info' | 'primary' | 'success' | 'error'> = {
-  Pending: 'warning',
-  Processing: 'info',
-  Shipped: 'primary',
-  Delivered: 'success',
-  Cancelled: 'error',
-}
 
 interface OrderDetailModalProps {
   order: Order | null
@@ -33,10 +29,20 @@ interface OrderDetailModalProps {
 }
 
 export default function OrderDetailModal({ order, open, onClose }: OrderDetailModalProps) {
+  const [editing, setEditing] = useState(false)
+
   if (!order) return null
 
+  // The API freezes delivered and cancelled orders
+  const editable = order.status !== 'Delivered' && order.status !== 'Cancelled'
+
+  const close = () => {
+    setEditing(false)
+    onClose()
+  }
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={close} maxWidth="md" fullWidth>
       <DialogTitle>
         Order Details: {order.orderNumber}
       </DialogTitle>
@@ -52,9 +58,19 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
 
           {/* Customer Info */}
           <div>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              Customer Information
-            </Typography>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Customer Information
+              </Typography>
+              {editable && !editing && (
+                <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)}>
+                  Edit
+                </Button>
+              )}
+            </Stack>
+            {editing ? (
+              <OrderDetailsForm order={order} onDone={() => setEditing(false)} />
+            ) : (
             <Table size="small">
               <TableBody>
                 <TableRow>
@@ -77,6 +93,7 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                 )}
               </TableBody>
             </Table>
+            )}
           </div>
 
           <Divider />
@@ -148,7 +165,7 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
         <Button startIcon={<PrintIcon />} onClick={() => printOrderSlip(order)}>
           Print slip
         </Button>
-        <Button onClick={onClose}>Close</Button>
+        <Button onClick={close}>Close</Button>
       </DialogActions>
     </Dialog>
   )

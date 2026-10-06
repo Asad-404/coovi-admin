@@ -1,12 +1,13 @@
 import apiClient from './client.ts'
+import { fetchAllPages } from './paginate.ts'
 import type { Product } from '@/types'
 
+// The API caps product pages at 50
+const PRODUCT_PAGE_SIZE = 50
+
 export const productsApi = {
-  // GET /products -> { success, data: [...], pagination }
-  getAll: async (limit = 100): Promise<Product[]> => {
-    const res = await apiClient.get('/products', { params: { limit } })
-    return res.data.data
-  },
+  // GET /products -> { success, data: [...], pagination } — every page
+  getAll: (): Promise<Product[]> => fetchAllPages<Product>('/products', PRODUCT_PAGE_SIZE),
 
   getBySlug: async (slug: string): Promise<Product> => {
     const res = await apiClient.get(`/products/${slug}`)

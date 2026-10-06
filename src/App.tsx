@@ -7,13 +7,12 @@ import LoginPage from '@/pages/LoginPage.tsx'
 import OrdersPage from '@/pages/OrdersPage.tsx'
 import ProductFormPage from '@/pages/ProductFormPage.tsx'
 import ProductsPage from '@/pages/ProductsPage.tsx'
+import { hasUsableToken } from '@/utils/auth'
 
-// Client-side guard: hides the dashboard pages when no token is stored.
+// Client-side guard: hides the dashboard pages when no unexpired token is stored.
 // Real security is on the API — every request still needs a valid JWT.
 function ProtectedRoute({ children }: { children: ReactNode }) {
-  const token = localStorage.getItem('admin_token')
-
-  if (!token) {
+  if (!hasUsableToken()) {
     return <Navigate to="/login" replace />
   }
 

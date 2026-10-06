@@ -8,6 +8,12 @@ const theme = createTheme({
     secondary: {
       main: '#06b5e4',
     },
+    // Softer than MUI's pure white so the admin is easier on the eyes
+    background: {
+      default: '#e3e8ef',
+      paper: '#f6f8fb',
+    },
+    divider: 'rgba(12, 41, 83, 0.14)',
   },
   typography: {
     fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
@@ -24,6 +30,20 @@ const theme = createTheme({
         root: {
           textTransform: 'none',
           fontWeight: 500,
+        },
+      },
+    },
+    MuiDrawer: {
+      styleOverrides: {
+        paper: {
+          backgroundColor: '#edf1f6',
+        },
+      },
+    },
+    MuiTableHead: {
+      styleOverrides: {
+        root: {
+          backgroundColor: '#e9edf3',
         },
       },
     },
