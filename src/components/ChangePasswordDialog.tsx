@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { useMutation } from '@tanstack/react-query'
-import axios from 'axios'
 import {
   Alert,
   Button,
@@ -14,6 +13,7 @@ import {
   TextField,
 } from '@mui/material'
 import { authApi } from '@/api/auth'
+import { getErrorMessage } from '@/api/errors'
 
 interface ChangePasswordDialogProps {
   open: boolean
@@ -43,14 +43,7 @@ export default function ChangePasswordDialog({ open, onClose }: ChangePasswordDi
   const mutation = useMutation({
     mutationFn: () => authApi.changePassword(currentPassword, newPassword),
     onSuccess: () => setDone(true),
-    onError: (err) => {
-      if (axios.isAxiosError(err)) {
-        const details: string[] | undefined = err.response?.data?.errors
-        setError(details?.join(', ') ?? err.response?.data?.message ?? 'Could not change the password')
-      } else {
-        setError('Could not change the password — is the API running?')
-      }
-    },
+    onError: (err) => setError(getErrorMessage(err, 'Could not change the password')),
   })
 
   const handleSubmit = (e: FormEvent) => {

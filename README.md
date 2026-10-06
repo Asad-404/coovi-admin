@@ -1,32 +1,50 @@
-# React + TypeScript + Vite
+# Coovi Admin
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Admin dashboard for the Coovi store: manage products, process orders and see sales at a glance.
+Built with Vite, React, TypeScript, MUI, React Router and TanStack Query, talking to the
+`coovi-api` service over its REST API.
 
-Currently, two official plugins are available:
+## Getting started
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
-
-## React Compiler
-
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the Oxlint configuration
-
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
-
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```bash
+pnpm install
+cp .env.example .env.local   # optional — set your API URL (see below)
+pnpm dev                     # http://localhost:5173
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+You need a running `coovi-api` and an admin account to sign in.
+
+### Configuration
+
+| Variable       | Default                     | Purpose                    |
+| -------------- | --------------------------- | -------------------------- |
+| `VITE_API_URL` | `http://localhost:5000/api` | Base URL of the coovi-api  |
+
+Put it in `.env.local` (git-ignored), for example:
+
+```bash
+VITE_API_URL=https://api.example.com/api
+```
+
+Never commit real URLs, credentials or tokens.
+
+## Scripts
+
+| Command        | What it does                         |
+| -------------- | ------------------------------------ |
+| `pnpm dev`     | Dev server with hot reload           |
+| `pnpm build`   | Type-check and build to `dist/`      |
+| `pnpm lint`    | Lint with oxlint                     |
+| `pnpm test`    | Unit tests with Vitest               |
+| `pnpm preview` | Serve the production build locally   |
+
+## How it fits together
+
+- `src/api/` — Axios client (adds the JWT, sends you to login when it expires) and one module per
+  resource. List endpoints are read page by page so stats, search and exports see every record.
+- `src/pages/` — Dashboard, Products (list + form), Orders, Login.
+- `src/utils/` — pure helpers (filters, stats, order status rules, CSV/print export) with tests
+  next to them.
+- The API is authoritative for prices, stock, totals, delivery fees and status changes; the admin
+  only offers the forward order flow (Pending → Processing → Shipped → Delivered, or Cancelled
+  before shipping) so stock stays correct.

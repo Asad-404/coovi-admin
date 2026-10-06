@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
-import axios from 'axios'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   Box,
@@ -14,9 +14,12 @@ import {
   Typography,
 } from '@mui/material'
 import { authApi } from '@/api/auth'
+import { getErrorMessage } from '@/api/errors'
+import { hasUsableToken, setToken } from '@/utils/auth'
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -29,17 +32,19 @@ export default function LoginPage() {
 
     try {
       const { token } = await authApi.login(email, password)
-      localStorage.setItem('admin_token', token)
+      setToken(token)
+      // Start the session with an empty cache, never another admin's data
+      queryClient.clear()
       navigate('/dashboard', { replace: true })
     } catch (err) {
-      if (axios.isAxiosError(err)) {
-        setError(err.response?.data?.message ?? 'Login failed')
-      } else {
-        setError('Login failed — is the API running?')
-      }
+      setError(getErrorMessage(err, 'Login failed'))
     } finally {
       setLoading(false)
     }
+  }
+
+  if (hasUsableToken()) {
+    return <Navigate to="/dashboard" replace />
   }
 
   return (

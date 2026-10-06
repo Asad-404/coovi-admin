@@ -14,17 +14,10 @@ import {
   Typography,
 } from '@mui/material'
 import PrintIcon from '@mui/icons-material/Print'
-import type { Order, OrderStatus } from '@/types'
+import type { Order } from '@/types'
+import { statusColor } from '@/utils/orderStatus'
 import { printOrderSlip } from '@/utils/orderExport'
 import { formatDate, formatPrice } from '@/utils/format'
-
-const statusColor: Record<OrderStatus, 'warning' | 'info' | 'primary' | 'success' | 'error'> = {
-  Pending: 'warning',
-  Processing: 'info',
-  Shipped: 'primary',
-  Delivered: 'success',
-  Cancelled: 'error',
-}
 
 interface OrderDetailModalProps {
   order: Order | null
