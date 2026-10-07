@@ -14,7 +14,9 @@ pnpm test
 pnpm preview
 ```
 
-Claude may run these commands to install dependencies, build, lint, and start the dev/preview server to check changes. Run `pnpm build`, `pnpm lint` and `pnpm test` before committing.
+Claude may run `pnpm install`, `pnpm build`, `pnpm lint` and `pnpm test` to check changes, and may push feature branches and open pull requests; never push `master`. Do not start `pnpm dev` or `pnpm preview` unless asked. Run `pnpm build`, `pnpm lint` and `pnpm test` before committing.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs lint, build and tests on every pull request and push to `master`. Keep it green.
 
 ## Architecture
 
