@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { FormEvent } from 'react'
+import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -16,8 +16,10 @@ import {
   Typography,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
+import { appendImageUrls, checkImageFile, getUploadErrorMessage, uploadsApi } from '@/api/uploads'
 import { useNotify } from '@/notify/context'
 import { slugify } from '@/utils/format'
 import type { Product } from '@/types'
@@ -118,6 +120,7 @@ function ProductForm({ product }: { product?: Product }) {
   const [form, setForm] = useState<ProductFormState>(() => (product ? formFromProduct(product) : emptyForm))
   const [slugEdited, setSlugEdited] = useState(false)
   const [error, setError] = useState('')
+  const [uploading, setUploading] = useState(false)
 
   const saveMutation = useMutation({
     mutationFn: (data: Partial<Product>) =>
@@ -143,6 +146,36 @@ function ProductForm({ product }: { product?: Product }) {
       name: value,
       slug: slugEdited || isEdit ? f.slug : slugify(value),
     }))
+  }
+
+  // Photos go from this browser straight to Cloudinary; the API only signs the request.
+  // Each finished upload is added to the URL box right away, so one failure keeps the rest.
+  const handleFilesPicked = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? [])
+    // Clear the picker so choosing the same file again still fires onChange
+    e.target.value = ''
+    if (files.length === 0) return
+
+    setError('')
+    const problem = files.map(checkImageFile).find(Boolean)
+    if (problem) {
+      setError(problem)
+      return
+    }
+
+    setUploading(true)
+    try {
+      const signature = await uploadsApi.getSignature()
+      for (const file of files) {
+        const url = await uploadsApi.uploadImage(file, signature)
+        setForm((f) => ({ ...f, imagesText: appendImageUrls(f.imagesText, [url]) }))
+      }
+      notify(files.length === 1 ? 'Photo uploaded' : `${files.length} photos uploaded`)
+    } catch (err) {
+      setError(getUploadErrorMessage(err))
+    } finally {
+      setUploading(false)
+    }
   }
 
   const handleSubmit = (e: FormEvent) => {
@@ -307,13 +340,27 @@ function ProductForm({ product }: { product?: Product }) {
               />
             </Stack>
 
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <Button
+                component="label"
+                variant="outlined"
+                disabled={uploading}
+                startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+              >
+                {uploading ? 'Uploading…' : 'Upload photos'}
+                <input type="file" accept="image/*" multiple hidden onChange={handleFilesPicked} />
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                JPG, PNG or WebP, up to 10 MB each
+              </Typography>
+            </Stack>
             <TextField
               label="Image URLs (one per line)"
               value={form.imagesText}
               onChange={(e) => set('imagesText', e.target.value)}
               multiline
               rows={4}
-              helperText="First image is used as the product thumbnail"
+              helperText="Uploaded photos are added here. First image is used as the product thumbnail"
               required
             />
             {imagePreviews.length > 0 && (
@@ -354,7 +401,7 @@ function ProductForm({ product }: { product?: Product }) {
                 type="submit"
                 variant="contained"
                 size="large"
-                disabled={saveMutation.isPending}
+                disabled={saveMutation.isPending || uploading}
                 startIcon={saveMutation.isPending ? <CircularProgress size={20} color="inherit" /> : undefined}
               >
                 {saveMutation.isPending
