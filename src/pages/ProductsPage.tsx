@@ -205,6 +205,9 @@ export default function ProductsPage() {
                         />
                         {/* Switched off in the form: the shop shows it as out of stock and the API refuses orders */}
                         {!product.inStock && <Chip size="small" variant="outlined" label="Not for sale" />}
+                        {product.inStock && product.allowPreorder && (
+                          <Chip size="small" variant="outlined" color="info" label="Pre-order" />
+                        )}
                       </Stack>
                     </TableCell>
                     <TableCell>{product.category}</TableCell>

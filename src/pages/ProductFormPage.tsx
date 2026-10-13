@@ -34,6 +34,8 @@ interface ProductFormState {
   category: string
   size: string
   inStock: boolean
+  allowPreorder: boolean
+  preorderDays: string
   description: string
   descriptionBn: string
   imagesText: string
@@ -49,6 +51,8 @@ const emptyForm: ProductFormState = {
   category: 'Saree',
   size: 'Free Size',
   inStock: true,
+  allowPreorder: false,
+  preorderDays: '15',
   description: '',
   descriptionBn: '',
   imagesText: '',
@@ -64,6 +68,8 @@ const formFromProduct = (p: Product): ProductFormState => ({
   category: p.category,
   size: p.size ?? '',
   inStock: p.inStock,
+  allowPreorder: p.allowPreorder ?? false,
+  preorderDays: String(p.preorderDays ?? 15),
   description: p.description ?? '',
   descriptionBn: p.descriptionBn ?? '',
   imagesText: p.images.join('\n'),
@@ -187,6 +193,7 @@ function ProductForm({ product }: { product?: Product }) {
     const price = Number(form.price)
     const stock = Number(form.stock)
     const compareAtPrice = form.compareAtPrice === '' ? null : Number(form.compareAtPrice)
+    const preorderDays = Number(form.preorderDays)
 
     // Same rules as the API's product schema, checked here for a friendlier message
     if (!form.name || !form.slug) {
@@ -209,6 +216,10 @@ function ProductForm({ product }: { product?: Product }) {
       setError('Stock must be a whole number, 0 or more')
       return
     }
+    if (!Number.isInteger(preorderDays) || preorderDays < 1 || preorderDays > 90) {
+      setError('Pre-order wait must be a whole number of days from 1 to 90')
+      return
+    }
     if (images.length === 0) {
       setError('At least one image URL is required')
       return
@@ -229,6 +240,8 @@ function ProductForm({ product }: { product?: Product }) {
       category: form.category || 'Saree',
       size: form.size || undefined,
       inStock: form.inStock,
+      allowPreorder: form.allowPreorder,
+      preorderDays,
       description: form.description || undefined,
       descriptionBn: form.descriptionBn || undefined,
       images,
@@ -337,6 +350,28 @@ function ProductForm({ product }: { product?: Product }) {
                   />
                 }
                 label="Available for sale"
+              />
+            </Stack>
+
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ alignItems: { md: 'center' } }}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={form.allowPreorder}
+                    onChange={(e) => set('allowPreorder', e.target.checked)}
+                  />
+                }
+                label="Take pre-orders when out of stock"
+              />
+              <TextField
+                label="Pre-order wait (days)"
+                slotProps={{ htmlInput: { min: 1, max: 90, step: 1 } }}
+                type="number"
+                value={form.preorderDays}
+                onChange={(e) => set('preorderDays', e.target.value)}
+                helperText="Shown to the customer. Pre-ordered pieces are never added to stock"
+                disabled={!form.allowPreorder}
+                sx={{ maxWidth: { md: 260 } }}
               />
             </Stack>
 

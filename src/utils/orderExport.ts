@@ -1,5 +1,6 @@
 import type { Order } from '@/types'
 import { formatDate, formatPrice } from '@/utils/format'
+import { itemLabel } from '@/utils/preorder'
 
 // A cell starting with = + - @ can run as a formula when the CSV is opened in Excel, so it is prefixed with a quote.
 const csvCell = (value: string | number): string => {
@@ -29,7 +30,7 @@ export const ordersToCsv = (orders: Order[]): string => {
     order.customerName,
     order.phone,
     order.address,
-    order.items.map((item) => `${item.name} x${item.quantity}`).join('; '),
+    order.items.map((item) => `${itemLabel(item)} x${item.quantity}`).join('; '),
     order.subtotal,
     order.deliveryFee,
     order.total,
@@ -58,7 +59,7 @@ export const printOrderSlip = (order: Order): void => {
   const rows = order.items
     .map(
       (item) => `<tr>
-        <td>${escapeHtml(item.name)}${item.size ? `<br><small>${escapeHtml(item.size)}</small>` : ''}</td>
+        <td>${escapeHtml(itemLabel(item))}${item.size ? `<br><small>${escapeHtml(item.size)}</small>` : ''}</td>
         <td class="num">${item.quantity}</td>
         <td class="num">${escapeHtml(formatPrice(item.price))}</td>
         <td class="num">${escapeHtml(formatPrice(item.price * item.quantity))}</td>
