@@ -34,10 +34,11 @@ import { useOrders } from '@/hooks/useOrders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
-import type { Order, OrderSource, OrderStatus } from '@/types'
+import type { DeliveryArea, Order, OrderSource, OrderStatus } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
+import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
 import { ORDER_SOURCES, SOURCE_LABELS, orderSource } from '@/utils/orderSource'
@@ -55,6 +56,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [areaFilter, setAreaFilter] = useState<DeliveryArea | 'All'>('All')
   const [sourceFilter, setSourceFilter] = useState<OrderSource | 'All'>('All')
 
   // The status filter lives in the URL so the dashboard can link to e.g. /orders?status=Pending
@@ -99,10 +101,19 @@ export default function OrdersPage() {
   }
 
   const filteredOrders = orders
-    ? filterOrders(orders, { search: searchTerm, status: statusFilter, from: fromDate, to: toDate, source: sourceFilter })
+    ? filterOrders(orders, {
+        search: searchTerm,
+        status: statusFilter,
+        area: areaFilter,
+        from: fromDate,
+        to: toDate,
+        source: sourceFilter,
+      })
     : undefined
 
-  const hasFilters = Boolean(searchTerm || fromDate || toDate || statusFilter !== 'All' || sourceFilter !== 'All')
+  const hasFilters = Boolean(
+    searchTerm || fromDate || toDate || statusFilter !== 'All' || areaFilter !== 'All' || sourceFilter !== 'All',
+  )
 
   return (
     <Stack spacing={3}>
@@ -150,6 +161,20 @@ export default function OrdersPage() {
           ))}
         </Select>
         <Select
+          value={areaFilter}
+          onChange={(e) => setAreaFilter(e.target.value as DeliveryArea | 'All')}
+          size="small"
+          sx={{ minWidth: 150 }}
+          inputProps={{ 'aria-label': 'Delivery area' }}
+        >
+          <MenuItem value="All">All areas</MenuItem>
+          {(Object.keys(DELIVERY_AREA_LABELS) as DeliveryArea[]).map((area) => (
+            <MenuItem key={area} value={area}>
+              {DELIVERY_AREA_LABELS[area]}
+            </MenuItem>
+          ))}
+        </Select>
+        <Select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value as OrderSource | 'All')}
           size="small"
@@ -185,6 +210,7 @@ export default function OrdersPage() {
               setSearchTerm('')
               setFromDate('')
               setToDate('')
+              setAreaFilter('All')
               setStatusFilter('All')
               setSourceFilter('All')
             }}

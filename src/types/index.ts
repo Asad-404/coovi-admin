@@ -2,6 +2,16 @@
 
 export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
 
+// Only Dhaka city is inside Dhaka; Dhaka suburbs and every other district are outside
+export type DeliveryArea = 'inside_dhaka' | 'outside_dhaka'
+
+// GET /orders/delivery-fee: the fee per area and the districts checkout offers
+export interface DeliveryOptions {
+  deliveryFee: number
+  zones: Record<DeliveryArea, number>
+  districts: string[]
+}
+
 // Where an order came from: the storefront checkout, or entered by an admin
 export type OrderSource = 'website' | 'facebook' | 'whatsapp' | 'phone' | 'other'
 export type ManualOrderSource = Exclude<OrderSource, 'website'>
@@ -46,6 +56,9 @@ export interface Order {
   customerName: string
   phone: string
   address: string
+  // Missing on orders placed before delivery areas existed (those paid the inside-Dhaka fee)
+  district?: string
+  deliveryArea?: DeliveryArea
   items: OrderItem[]
   subtotal: number
   // Taka off the items, agreed on a manual order (0 or missing for website orders)
@@ -82,7 +95,9 @@ export interface OrderList {
 }
 
 // Fields an admin may correct on an existing order
-export type OrderDetailsUpdate = Partial<Pick<Order, 'customerName' | 'phone' | 'address' | 'notes'>>
+export type OrderDetailsUpdate = Partial<
+  Pick<Order, 'customerName' | 'phone' | 'address' | 'notes' | 'district' | 'deliveryArea'>
+>
 
 export interface Admin {
   _id: string
