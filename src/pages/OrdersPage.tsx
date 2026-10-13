@@ -37,6 +37,7 @@ import OrderDetailModal from '@/components/OrderDetailModal'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
+import { hasPreorder } from '@/utils/preorder'
 
 const isStatus = (value: string | null): value is OrderStatus =>
   STATUSES.includes(value as OrderStatus)
@@ -226,7 +227,10 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell>{formatPrice(order.total)}</TableCell>
                       <TableCell>
-                        <Chip size="small" label={order.status} color={statusColor[order.status]} />
+                        <Stack direction="row" spacing={0.5}>
+                          <Chip size="small" label={order.status} color={statusColor[order.status]} />
+                          {hasPreorder(order) && <Chip size="small" variant="outlined" color="info" label="Pre-order" />}
+                        </Stack>
                       </TableCell>
                       <TableCell>
                         {nextStatuses.length === 0 ? (
