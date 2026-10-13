@@ -80,3 +80,13 @@ export interface AuthResponse {
     role: string
   }
 }
+
+// GET /settings/admin — shop-wide settings the owner edits on the Settings page
+export interface ShopSettings {
+  whatsappNumber: string // 8801XXXXXXXXX
+  supportPhone: string // 01XXXXXXXXX or ''
+  announcementText: string
+  announcementActive: boolean
+  lowStockThreshold: number
+  updatedAt?: string
+}

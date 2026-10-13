@@ -19,7 +19,11 @@ const compare: Record<ProductSort, (a: Product, b: Product) => number> = {
   'stock-asc': (a, b) => a.stock - b.stock,
 }
 
-export const filterProducts = (products: Product[], { search, category, stock, sort }: ProductFilters): Product[] => {
+export const filterProducts = (
+  products: Product[],
+  { search, category, stock, sort }: ProductFilters,
+  lowStockThreshold = LOW_STOCK_THRESHOLD,
+): Product[] => {
   const term = search.trim().toLowerCase()
   return products
     .filter((p) => {
@@ -30,7 +34,7 @@ export const filterProducts = (products: Product[], { search, category, stock, s
         (p.nameBn ?? '').includes(search.trim())
       const matchesCategory = !category || p.category === category
       const matchesStock =
-        stock === 'all' || (stock === 'out' ? p.stock === 0 : p.stock < LOW_STOCK_THRESHOLD)
+        stock === 'all' || (stock === 'out' ? p.stock === 0 : p.stock < lowStockThreshold)
       return matchesSearch && matchesCategory && matchesStock
     })
     .sort(compare[sort])
