@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link as RouterLink, useSearchParams } from 'react-router-dom'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   Button,
@@ -28,16 +28,19 @@ import {
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import DownloadIcon from '@mui/icons-material/Download'
+import AddIcon from '@mui/icons-material/Add'
 import { ordersApi } from '@/api/orders'
+import { useOrders } from '@/hooks/useOrders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
-import type { Order, OrderStatus } from '@/types'
+import type { Order, OrderSource, OrderStatus } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
+import { ORDER_SOURCES, SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 
 const isStatus = (value: string | null): value is OrderStatus =>
   STATUSES.includes(value as OrderStatus)
@@ -52,6 +55,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [sourceFilter, setSourceFilter] = useState<OrderSource | 'All'>('All')
 
   // The status filter lives in the URL so the dashboard can link to e.g. /orders?status=Pending
   const statusParam = searchParams.get('status')
@@ -59,10 +63,7 @@ export default function OrdersPage() {
   const setStatusFilter = (status: OrderStatus | 'All') =>
     setSearchParams(status === 'All' ? {} : { status }, { replace: true })
 
-  const { data: orders, isLoading, isError } = useQuery({
-    queryKey: ['orders'],
-    queryFn: ordersApi.getAll,
-  })
+  const { data: orders, isLoading, isError } = useOrders()
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
@@ -98,25 +99,30 @@ export default function OrdersPage() {
   }
 
   const filteredOrders = orders
-    ? filterOrders(orders, { search: searchTerm, status: statusFilter, from: fromDate, to: toDate })
+    ? filterOrders(orders, { search: searchTerm, status: statusFilter, from: fromDate, to: toDate, source: sourceFilter })
     : undefined
 
-  const hasFilters = Boolean(searchTerm || fromDate || toDate || statusFilter !== 'All')
+  const hasFilters = Boolean(searchTerm || fromDate || toDate || statusFilter !== 'All' || sourceFilter !== 'All')
 
   return (
     <Stack spacing={3}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4">Orders</Typography>
-        <Button
-          variant="outlined"
-          startIcon={<DownloadIcon />}
-          disabled={!filteredOrders?.length}
-          onClick={() =>
-            downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
-          }
-        >
-          Export CSV
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button variant="contained" startIcon={<AddIcon />} component={RouterLink} to="/orders/new">
+            Add order
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<DownloadIcon />}
+            disabled={!filteredOrders?.length}
+            onClick={() =>
+              downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
+            }
+          >
+            Export CSV
+          </Button>
+        </Stack>
       </Stack>
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
@@ -143,6 +149,20 @@ export default function OrdersPage() {
             </MenuItem>
           ))}
         </Select>
+        <Select
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value as OrderSource | 'All')}
+          size="small"
+          sx={{ minWidth: 150 }}
+          inputProps={{ 'aria-label': 'Source' }}
+        >
+          <MenuItem value="All">All sources</MenuItem>
+          {ORDER_SOURCES.map((source) => (
+            <MenuItem key={source} value={source}>
+              {SOURCE_LABELS[source]}
+            </MenuItem>
+          ))}
+        </Select>
         <TextField
           label="From"
           type="date"
@@ -166,6 +186,7 @@ export default function OrdersPage() {
               setFromDate('')
               setToDate('')
               setStatusFilter('All')
+              setSourceFilter('All')
             }}
           >
             Clear
@@ -190,12 +211,13 @@ export default function OrdersPage() {
           </Typography>
 
           <TableContainer component={Paper}>
-            <Table sx={{ minWidth: 900 }}>
+            <Table sx={{ minWidth: 1000 }}>
               <TableHead>
                 <TableRow>
                   <TableCell>Order #</TableCell>
                   <TableCell>Date</TableCell>
                   <TableCell>Customer</TableCell>
+                  <TableCell>Source</TableCell>
                   <TableCell>Items</TableCell>
                   <TableCell>Total</TableCell>
                   <TableCell>Status</TableCell>
@@ -222,6 +244,7 @@ export default function OrdersPage() {
                           </Stack>
                         </Tooltip>
                       </TableCell>
+                      <TableCell>{SOURCE_LABELS[orderSource(order)]}</TableCell>
                       <TableCell>
                         {itemCount} item{itemCount === 1 ? '' : 's'}
                       </TableCell>
@@ -271,7 +294,7 @@ export default function OrdersPage() {
                 })}
                 {filteredOrders?.length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={8}>
+                    <TableCell colSpan={9}>
                       <Typography align="center" color="text.secondary" sx={{ py: 3 }}>
                         {hasFilters
                           ? 'No orders match your filters.'

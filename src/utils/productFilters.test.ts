@@ -28,6 +28,11 @@ describe('filterProducts', () => {
     expect(ids(filterProducts(products, { ...none, stock: 'out' }))).toEqual(['c'])
   })
 
+  it('uses the low-stock limit saved in settings when given', () => {
+    expect(ids(filterProducts(products, { ...none, stock: 'low' }, 1))).toEqual(['c'])
+    expect(ids(filterProducts(products, { ...none, stock: 'low' }, 20))).toEqual(['b', 'c', 'a'])
+  })
+
   it('sorts by price', () => {
     expect(ids(filterProducts(products, { ...none, sort: 'price-asc' }))).toEqual(['b', 'c', 'a'])
   })
