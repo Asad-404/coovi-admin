@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
   AppBar,
+  Badge,
   Box,
   Button,
   Divider,
@@ -26,6 +27,9 @@ import MenuIcon from '@mui/icons-material/Menu'
 import SettingsIcon from '@mui/icons-material/Settings'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 import { clearToken } from '@/utils/auth'
+import { useOrders, useOrderSync } from '@/hooks/useOrders'
+import { countPending } from '@/utils/orderSync'
+import { pendingTitle } from '@/utils/pendingOrders'
 
 const drawerWidth = 240
 
@@ -44,6 +48,16 @@ export default function DashboardLayout() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
+
+  // Orders changed anywhere (new orders, cancels, edits on another device) are merged in
+  // every minute without a page reload; the badge and tab title count the Pending ones
+  useOrderSync()
+  const { data: orders } = useOrders()
+  const pendingCount = orders ? countPending(orders) : 0
+
+  useEffect(() => {
+    document.title = pendingTitle(pendingCount)
+  }, [pendingCount])
 
   const logout = () => {
     clearToken()
@@ -68,7 +82,15 @@ export default function DashboardLayout() {
             selected={location.pathname.startsWith(item.to)}
             onClick={() => go(item.to)}
           >
-            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemIcon>
+              {item.to === '/orders' ? (
+                <Badge badgeContent={pendingCount} color="error" aria-label={`${pendingCount} pending orders`}>
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )}
+            </ListItemIcon>
             <ListItemText primary={item.label} />
           </ListItemButton>
         ))}
