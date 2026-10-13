@@ -46,6 +46,12 @@ export const ordersApi = {
     return res.data.data
   },
 
+  // POST /orders/:id/notes -> { success, data: order } — private note, append-only
+  addNote: async (id: string, text: string): Promise<Order> => {
+    const res = await apiClient.post(`/orders/${id}/notes`, { text })
+    return res.data.data
+  },
+
   // PATCH /orders/:id/status -> { success, data: order }
   updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
     const res = await apiClient.patch(`/orders/${id}/status`, { status })

@@ -17,6 +17,7 @@ import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
+import OrderTimeline from '@/components/OrderTimeline'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
 import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
@@ -189,6 +190,10 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
               </TableBody>
             </Table>
           </div>
+
+          <Divider />
+
+          <OrderTimeline order={order} />
         </Stack>
       </DialogContent>
       <DialogActions>
