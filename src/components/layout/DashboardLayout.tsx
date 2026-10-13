@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   AppBar,
+  Badge,
   Box,
   Button,
   Divider,
@@ -25,6 +26,8 @@ import LockResetIcon from '@mui/icons-material/LockReset'
 import MenuIcon from '@mui/icons-material/Menu'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 import { clearToken } from '@/utils/auth'
+import { ordersApi } from '@/api/orders'
+import { PENDING_POLL_MS, pendingTitle } from '@/utils/pendingOrders'
 
 const drawerWidth = 240
 
@@ -42,6 +45,25 @@ export default function DashboardLayout() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
+
+  // New orders show up without a page reload: the Pending count is checked every minute,
+  // even in a background tab, and a change refreshes the order lists too
+  const { data: pendingCount = 0 } = useQuery({
+    queryKey: ['orders', 'pending-count'],
+    queryFn: ordersApi.pendingCount,
+    refetchInterval: PENDING_POLL_MS,
+    refetchIntervalInBackground: true,
+    staleTime: 0,
+  })
+  const lastPending = useRef<number | null>(null)
+
+  useEffect(() => {
+    document.title = pendingTitle(pendingCount)
+    if (lastPending.current !== null && lastPending.current !== pendingCount) {
+      queryClient.invalidateQueries({ queryKey: ['orders'], exact: true })
+    }
+    lastPending.current = pendingCount
+  }, [pendingCount, queryClient])
 
   const logout = () => {
     clearToken()
@@ -66,7 +88,15 @@ export default function DashboardLayout() {
             selected={location.pathname.startsWith(item.to)}
             onClick={() => go(item.to)}
           >
-            <ListItemIcon>{item.icon}</ListItemIcon>
+            <ListItemIcon>
+              {item.to === '/orders' ? (
+                <Badge badgeContent={pendingCount} color="error" aria-label={`${pendingCount} pending orders`}>
+                  {item.icon}
+                </Badge>
+              ) : (
+                item.icon
+              )}
+            </ListItemIcon>
             <ListItemText primary={item.label} />
           </ListItemButton>
         ))}
