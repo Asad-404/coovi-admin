@@ -20,6 +20,7 @@ import { useTheme } from '@mui/material/styles'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import Inventory2Icon from '@mui/icons-material/Inventory2'
 import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
+import PaymentsIcon from '@mui/icons-material/Payments'
 import LogoutIcon from '@mui/icons-material/Logout'
 import LockResetIcon from '@mui/icons-material/LockReset'
 import MenuIcon from '@mui/icons-material/Menu'
@@ -32,6 +33,7 @@ const navItems = [
   { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Products', to: '/products', icon: <Inventory2Icon /> },
   { label: 'Orders', to: '/orders', icon: <ReceiptLongIcon /> },
+  { label: 'Courier payments', to: '/courier-payments', icon: <PaymentsIcon /> },
 ]
 
 export default function DashboardLayout() {
