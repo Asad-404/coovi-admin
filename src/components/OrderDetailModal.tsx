@@ -21,6 +21,7 @@ import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
 import { printOrderSlip } from '@/utils/orderExport'
 import { formatDate, formatPrice } from '@/utils/format'
+import { describeDelivery } from '@/utils/deliveryArea'
 
 interface OrderDetailModalProps {
   order: Order | null
@@ -84,6 +85,10 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'medium' }}>Address</TableCell>
                   <TableCell>{order.address}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'medium' }}>Delivery area</TableCell>
+                  <TableCell>{describeDelivery(order)}</TableCell>
                 </TableRow>
                 {order.notes && (
                   <TableRow>

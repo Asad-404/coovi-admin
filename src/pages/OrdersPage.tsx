@@ -32,10 +32,11 @@ import { ordersApi } from '@/api/orders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
-import type { Order, OrderStatus } from '@/types'
+import type { DeliveryArea, Order, OrderStatus } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
+import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 
 const isStatus = (value: string | null): value is OrderStatus =>
@@ -51,6 +52,7 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [areaFilter, setAreaFilter] = useState<DeliveryArea | 'All'>('All')
 
   // The status filter lives in the URL so the dashboard can link to e.g. /orders?status=Pending
   const statusParam = searchParams.get('status')
@@ -97,10 +99,10 @@ export default function OrdersPage() {
   }
 
   const filteredOrders = orders
-    ? filterOrders(orders, { search: searchTerm, status: statusFilter, from: fromDate, to: toDate })
+    ? filterOrders(orders, { search: searchTerm, status: statusFilter, area: areaFilter, from: fromDate, to: toDate })
     : undefined
 
-  const hasFilters = Boolean(searchTerm || fromDate || toDate || statusFilter !== 'All')
+  const hasFilters = Boolean(searchTerm || fromDate || toDate || statusFilter !== 'All' || areaFilter !== 'All')
 
   return (
     <Stack spacing={3}>
@@ -142,6 +144,20 @@ export default function OrdersPage() {
             </MenuItem>
           ))}
         </Select>
+        <Select
+          value={areaFilter}
+          onChange={(e) => setAreaFilter(e.target.value as DeliveryArea | 'All')}
+          size="small"
+          sx={{ minWidth: 150 }}
+          inputProps={{ 'aria-label': 'Delivery area' }}
+        >
+          <MenuItem value="All">All Areas</MenuItem>
+          {(Object.keys(DELIVERY_AREA_LABELS) as DeliveryArea[]).map((area) => (
+            <MenuItem key={area} value={area}>
+              {DELIVERY_AREA_LABELS[area]}
+            </MenuItem>
+          ))}
+        </Select>
         <TextField
           label="From"
           type="date"
@@ -164,6 +180,7 @@ export default function OrdersPage() {
               setSearchTerm('')
               setFromDate('')
               setToDate('')
+              setAreaFilter('All')
               setStatusFilter('All')
             }}
           >
