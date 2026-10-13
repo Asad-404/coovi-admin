@@ -1,5 +1,6 @@
 import type { Order } from '@/types'
 import { formatDate, formatPrice } from '@/utils/format'
+import { DELIVERY_AREA_LABELS, describeDelivery, orderArea } from '@/utils/deliveryArea'
 import { itemLabel } from '@/utils/preorder'
 import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 
@@ -17,12 +18,15 @@ export const ordersToCsv = (orders: Order[]): string => {
     'Customer',
     'Phone',
     'Address',
+    'District',
+    'Delivery area',
     'Items',
     'Subtotal',
     'Discount',
     'Delivery',
     'Total',
     'Status',
+    'Reason',
     'Payment',
     'Notes',
     'Source',
@@ -34,12 +38,15 @@ export const ordersToCsv = (orders: Order[]): string => {
     order.customerName,
     order.phone,
     order.address,
+    order.district ?? '',
+    DELIVERY_AREA_LABELS[orderArea(order)],
     order.items.map((item) => `${itemLabel(item)} x${item.quantity}`).join('; '),
     order.subtotal,
     order.discount ?? 0,
     order.deliveryFee,
     order.total,
     order.status,
+    order.cancelReason ?? '',
     order.paymentMethod,
     order.notes ?? '',
     SOURCE_LABELS[orderSource(order)],
@@ -91,7 +98,7 @@ export const printOrderSlip = (order: Order): void => {
     <div style="text-align:right"><strong>${escapeHtml(order.orderNumber)}</strong><br>${escapeHtml(formatDate(order.createdAt))}<br>Status: ${escapeHtml(order.status)}${order.courier?.trackingCode ? `<br>Steadfast: ${escapeHtml(order.courier.trackingCode)}` : ''}</div>
   </div>
   <h2>Deliver to</h2>
-  <div class="box"><strong>${escapeHtml(order.customerName)}</strong><br>${escapeHtml(order.phone)}<br>${escapeHtml(order.address)}${order.notes ? `<br><em>Note: ${escapeHtml(order.notes)}</em>` : ''}</div>
+  <div class="box"><strong>${escapeHtml(order.customerName)}</strong><br>${escapeHtml(order.phone)}<br>${escapeHtml(order.address)}<br><strong>${escapeHtml(describeDelivery(order))}</strong>${order.notes ? `<br><em>Note: ${escapeHtml(order.notes)}</em>` : ''}</div>
   <h2>Items</h2>
   <table>
     <thead><tr><th>Saree</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>
