@@ -8,7 +8,7 @@ const none: OrderFilters = { search: '', status: 'All', area: 'All', from: '', t
 const orders = [
   makeOrder({ _id: 'a', orderNumber: 'ORD-1', customerName: 'Rahima', phone: '01711111111', status: 'Pending', createdAt: '2026-10-01T06:00:00' }),
   makeOrder({ _id: 'b', orderNumber: 'ORD-2', customerName: 'Karim', phone: '01822222222', status: 'Delivered', createdAt: '2026-10-03T06:00:00', district: 'Khulna', deliveryArea: 'outside_dhaka' }),
-  makeOrder({ _id: 'c', orderNumber: 'ORD-3', customerName: 'Nasrin', phone: '01933333333', status: 'Pending', createdAt: '2026-10-05T23:30:00' }),
+  makeOrder({ _id: 'c', orderNumber: 'ORD-3', customerName: 'Nasrin', phone: '01933333333', status: 'Pending', createdAt: '2026-10-05T23:30:00', source: 'facebook' }),
 ]
 const ids = (list: { _id: string }[]) => list.map((o) => o._id)
 
@@ -35,5 +35,11 @@ describe('filterOrders', () => {
   it('includes whole days at both ends of the date range', () => {
     expect(ids(filterOrders(orders, { ...none, from: '2026-10-03', to: '2026-10-05' }))).toEqual(['b', 'c'])
     expect(ids(filterOrders(orders, { ...none, to: '2026-10-01' }))).toEqual(['a'])
+  })
+
+  it('filters by source, counting orders without one as website orders', () => {
+    expect(ids(filterOrders(orders, { ...none, source: 'facebook' }))).toEqual(['c'])
+    expect(ids(filterOrders(orders, { ...none, source: 'website' }))).toEqual(['a', 'b'])
+    expect(ids(filterOrders(orders, { ...none, source: 'All' }))).toEqual(['a', 'b', 'c'])
   })
 })

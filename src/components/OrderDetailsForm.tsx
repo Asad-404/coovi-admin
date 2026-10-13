@@ -144,7 +144,7 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
           {areaChanged && newFee !== undefined && (
             <Typography variant="body2" color="warning.main">
               The delivery fee will change from {formatPrice(order.deliveryFee)} to {formatPrice(newFee)}, so the
-              total becomes {formatPrice(order.subtotal + newFee)}.
+              total becomes {formatPrice(order.subtotal - (order.discount ?? 0) + newFee)}.
             </Typography>
           )}
         </Stack>

@@ -22,4 +22,19 @@ describe('ordersToCsv', () => {
     expect(row).toContain(`"'=HYPERLINK(""x"")"`)
     expect(row).toContain('"say ""hi"""')
   })
+
+  it('includes the discount and the source', () => {
+    const csv = ordersToCsv([makeOrder({ subtotal: 2000, discount: 200, total: 1860, source: 'facebook' })])
+    const [header, row] = csv.split('\r\n')
+    expect(header).toContain('"Discount"')
+    expect(header).toContain('"Source"')
+    expect(row).toContain('"200"')
+    expect(row).toContain('"Facebook"')
+  })
+
+  it('shows website orders without a discount as 0 and Website', () => {
+    const row = ordersToCsv([makeOrder()]).split('\r\n')[1]
+    expect(row).toContain('"2000","0","60","2060"')
+    expect(row).toContain('"Website"')
+  })
 })
