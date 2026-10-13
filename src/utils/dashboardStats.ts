@@ -2,9 +2,11 @@ import { LOW_STOCK_THRESHOLD } from '@/constants'
 import type { Order, OrderStatus, Product } from '@/types'
 import { STATUSES } from '@/utils/orderStatus'
 
-// Cancelled orders never bring in money, so they don't count as revenue
+// Cancelled and returned orders don't bring in money, so they don't count as revenue
+const earnsMoney = (order: Order): boolean => order.status !== 'Cancelled' && order.status !== 'Returned'
+
 export const revenueOf = (orders: Order[]): number =>
-  orders.filter((o) => o.status !== 'Cancelled').reduce((sum, o) => sum + o.total, 0)
+  orders.filter(earnsMoney).reduce((sum, o) => sum + o.total, 0)
 
 export const countByStatus = (orders: Order[]): Record<OrderStatus, number> => {
   const counts = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<OrderStatus, number>
@@ -24,7 +26,7 @@ export interface DailyRevenue {
 const localDateKey = (d: Date): string =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
-// Revenue per day for the last `days` days (oldest first), cancelled excluded
+// Revenue per day for the last `days` days (oldest first), cancelled and returned excluded
 export const dailyRevenue = (orders: Order[], days: number, now = new Date()): DailyRevenue[] => {
   const buckets = new Map<string, DailyRevenue>()
   for (let i = days - 1; i >= 0; i--) {
@@ -33,7 +35,7 @@ export const dailyRevenue = (orders: Order[], days: number, now = new Date()): D
     buckets.set(key, { date: key, revenue: 0, orders: 0 })
   }
   for (const order of orders) {
-    if (order.status === 'Cancelled') continue
+    if (!earnsMoney(order)) continue
     const bucket = buckets.get(localDateKey(new Date(order.createdAt)))
     if (bucket) {
       bucket.revenue += order.total

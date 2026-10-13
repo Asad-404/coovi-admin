@@ -6,10 +6,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   MenuItem,
   Paper,
@@ -27,6 +23,7 @@ import {
   Typography,
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import StickyNote2Icon from '@mui/icons-material/StickyNote2'
 import DownloadIcon from '@mui/icons-material/Download'
 import AddIcon from '@mui/icons-material/Add'
 import { ordersApi } from '@/api/orders'
@@ -34,10 +31,12 @@ import { useOrders } from '@/hooks/useOrders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
-import type { Order, OrderSource, OrderStatus } from '@/types'
+import type { DeliveryArea, Order, OrderSource, OrderStatus, StatusUpdate } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
+import StatusChangeDialog from '@/components/StatusChangeDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
+import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
 import { ORDER_SOURCES, SOURCE_LABELS, orderSource } from '@/utils/orderSource'
@@ -51,10 +50,12 @@ export default function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
+  // Cancelling or returning asks for a reason first
+  const [pendingChange, setPendingChange] = useState<{ order: Order; status: 'Cancelled' | 'Returned' } | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [areaFilter, setAreaFilter] = useState<DeliveryArea | 'All'>('All')
   const [sourceFilter, setSourceFilter] = useState<OrderSource | 'All'>('All')
 
   // The status filter lives in the URL so the dashboard can link to e.g. /orders?status=Pending
@@ -66,17 +67,16 @@ export default function OrdersPage() {
   const { data: orders, isLoading, isError } = useOrders()
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
-      ordersApi.updateStatus(id, status),
+    mutationFn: ({ id, change }: { id: string; change: StatusUpdate }) => ordersApi.updateStatus(id, change),
     onSuccess: (order) => {
       setError('')
-      setCancelTarget(null)
+      setPendingChange(null)
       notify(`${order.orderNumber} is now ${order.status}`)
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
     },
     onError: (err) => {
-      setCancelTarget(null)
+      setPendingChange(null)
       setError(getErrorMessage(err, 'Status update failed'))
       // A 409 usually means the order changed elsewhere — show its current state
       queryClient.invalidateQueries({ queryKey: ['orders'] })
@@ -91,18 +91,27 @@ export default function OrdersPage() {
 
   const handleChange = (order: Order, status: OrderStatus) => {
     if (status === order.status) return
-    if (status === 'Cancelled') {
-      setCancelTarget(order)
+    if (status === 'Cancelled' || status === 'Returned') {
+      setPendingChange({ order, status })
       return
     }
-    statusMutation.mutate({ id: order._id, status })
+    statusMutation.mutate({ id: order._id, change: { status } })
   }
 
   const filteredOrders = orders
-    ? filterOrders(orders, { search: searchTerm, status: statusFilter, from: fromDate, to: toDate, source: sourceFilter })
+    ? filterOrders(orders, {
+        search: searchTerm,
+        status: statusFilter,
+        area: areaFilter,
+        from: fromDate,
+        to: toDate,
+        source: sourceFilter,
+      })
     : undefined
 
-  const hasFilters = Boolean(searchTerm || fromDate || toDate || statusFilter !== 'All' || sourceFilter !== 'All')
+  const hasFilters = Boolean(
+    searchTerm || fromDate || toDate || statusFilter !== 'All' || areaFilter !== 'All' || sourceFilter !== 'All',
+  )
 
   return (
     <Stack spacing={3}>
@@ -150,6 +159,20 @@ export default function OrdersPage() {
           ))}
         </Select>
         <Select
+          value={areaFilter}
+          onChange={(e) => setAreaFilter(e.target.value as DeliveryArea | 'All')}
+          size="small"
+          sx={{ minWidth: 150 }}
+          inputProps={{ 'aria-label': 'Delivery area' }}
+        >
+          <MenuItem value="All">All areas</MenuItem>
+          {(Object.keys(DELIVERY_AREA_LABELS) as DeliveryArea[]).map((area) => (
+            <MenuItem key={area} value={area}>
+              {DELIVERY_AREA_LABELS[area]}
+            </MenuItem>
+          ))}
+        </Select>
+        <Select
           value={sourceFilter}
           onChange={(e) => setSourceFilter(e.target.value as OrderSource | 'All')}
           size="small"
@@ -185,6 +208,7 @@ export default function OrdersPage() {
               setSearchTerm('')
               setFromDate('')
               setToDate('')
+              setAreaFilter('All')
               setStatusFilter('All')
               setSourceFilter('All')
             }}
@@ -232,7 +256,16 @@ export default function OrdersPage() {
                   const saving = savingId === order._id
                   return (
                     <TableRow key={order._id} hover>
-                      <TableCell>{order.orderNumber}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                          <span>{order.orderNumber}</span>
+                          {Boolean(order.internalNotes?.length) && (
+                            <Tooltip title={`${order.internalNotes!.length} private note${order.internalNotes!.length === 1 ? '' : 's'}`}>
+                              <StickyNote2Icon fontSize="small" color="action" aria-label="Has private notes" />
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </TableCell>
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                       <TableCell>
                         <Tooltip title={order.address}>
@@ -312,33 +345,19 @@ export default function OrdersPage() {
       <Typography variant="body2" color="text.secondary">
         Orders move forward only: Pending → Processing → Shipped → Delivered, or Cancelled from
         Pending/Processing. Pending → Processing takes the items out of stock; Processing → Cancelled
-        puts them back.
+        puts them back. A parcel refused at the door is Shipped → Returned, which puts the items back unless
+        you untick it. Delivered is final: the shop takes no returns after delivery.
       </Typography>
 
-      {/* Cancel confirmation — cancelling is final and can change stock */}
-      <Dialog open={cancelTarget !== null} onClose={() => !statusMutation.isPending && setCancelTarget(null)}>
-        <DialogTitle>Cancel order {cancelTarget?.orderNumber}?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {cancelTarget?.customerName}'s order will be cancelled. This can't be undone.
-            {cancelTarget?.status === 'Processing' && ' Its items will be returned to stock.'}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCancelTarget(null)} disabled={statusMutation.isPending}>
-            Keep order
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            disabled={statusMutation.isPending}
-            startIcon={statusMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
-            onClick={() => cancelTarget && statusMutation.mutate({ id: cancelTarget._id, status: 'Cancelled' })}
-          >
-            Cancel order
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Cancel or mark returned: asks for the reason and restock */}
+      <StatusChangeDialog
+        key={pendingChange ? `${pendingChange.order._id}-${pendingChange.status}` : 'closed'}
+        order={pendingChange?.order ?? null}
+        status={pendingChange?.status ?? 'Cancelled'}
+        saving={statusMutation.isPending}
+        onClose={() => setPendingChange(null)}
+        onConfirm={(change) => pendingChange && statusMutation.mutate({ id: pendingChange.order._id, change })}
+      />
 
       {/* Order Detail Modal */}
       <OrderDetailModal

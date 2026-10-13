@@ -17,11 +17,13 @@ import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
+import OrderTimeline from '@/components/OrderTimeline'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
 import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 import { printOrderSlip } from '@/utils/orderExport'
 import { formatDate, formatPrice } from '@/utils/format'
+import { describeDelivery } from '@/utils/deliveryArea'
 
 interface OrderDetailModalProps {
   order: Order | null
@@ -34,8 +36,8 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
 
   if (!order) return null
 
-  // The API freezes delivered and cancelled orders
-  const editable = order.status !== 'Delivered' && order.status !== 'Cancelled'
+  // The API freezes delivered, cancelled and returned orders
+  const editable = !['Delivered', 'Cancelled', 'Returned'].includes(order.status)
 
   const close = () => {
     setEditing(false)
@@ -55,6 +57,30 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
               Status
             </Typography>
             <Chip label={order.status} color={statusColor[order.status]} />
+            {(order.cancelReason || order.status === 'Returned') && (
+              <Table size="small" sx={{ mt: 1 }}>
+                <TableBody>
+                  {order.cancelReason && (
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'medium', width: '30%' }}>Reason</TableCell>
+                      <TableCell>{order.cancelReason}</TableCell>
+                    </TableRow>
+                  )}
+                  {order.returnedAt && (
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'medium' }}>Returned on</TableCell>
+                      <TableCell>{formatDate(order.returnedAt)}</TableCell>
+                    </TableRow>
+                  )}
+                  {order.status === 'Returned' && (
+                    <TableRow>
+                      <TableCell sx={{ fontWeight: 'medium' }}>Stock</TableCell>
+                      <TableCell>{order.restocked ? 'Put back in stock' : 'Not put back'}</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            )}
           </div>
 
           {/* Customer Info */}
@@ -85,6 +111,10 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'medium' }}>Address</TableCell>
                   <TableCell>{order.address}</TableCell>
+                </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'medium' }}>Delivery area</TableCell>
+                  <TableCell>{describeDelivery(order)}</TableCell>
                 </TableRow>
                 {order.notes && (
                   <TableRow>
@@ -184,6 +214,10 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
               </TableBody>
             </Table>
           </div>
+
+          <Divider />
+
+          <OrderTimeline order={order} />
         </Stack>
       </DialogContent>
       <DialogActions>
