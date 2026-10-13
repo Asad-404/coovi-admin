@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import apiClient from './client'
-import { fetchAllPages } from './paginate'
+import { fetchAllPages, fetchAllPagesWithTime } from './paginate'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -18,5 +18,18 @@ describe('fetchAllPages', () => {
   it('stops on an empty page even if pagination is missing', async () => {
     vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: [] } })
     expect(await fetchAllPages('/products', 50)).toEqual([])
+  })
+})
+
+describe('fetchAllPagesWithTime', () => {
+  it('returns the server time from the first page', async () => {
+    vi.spyOn(apiClient, 'get').mockImplementation(async (_url, config) => {
+      const page = (config!.params as { page: number }).page
+      return { data: { data: [page], serverTime: `t${page}`, pagination: { pages: 2 } } }
+    })
+    expect(await fetchAllPagesWithTime<number>('/orders', 1, { updatedSince: 'x' })).toEqual({
+      items: [1, 2],
+      serverTime: 't1',
+    })
   })
 })

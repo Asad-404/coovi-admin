@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   Button,
@@ -29,6 +29,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import DownloadIcon from '@mui/icons-material/Download'
 import { ordersApi } from '@/api/orders'
+import { useOrders } from '@/hooks/useOrders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
@@ -59,10 +60,7 @@ export default function OrdersPage() {
   const setStatusFilter = (status: OrderStatus | 'All') =>
     setSearchParams(status === 'All' ? {} : { status }, { replace: true })
 
-  const { data: orders, isLoading, isError } = useQuery({
-    queryKey: ['orders'],
-    queryFn: ordersApi.getAll,
-  })
+  const { data: orders, isLoading, isError } = useOrders()
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>

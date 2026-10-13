@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AppBar,
   Badge,
@@ -26,8 +26,9 @@ import LockResetIcon from '@mui/icons-material/LockReset'
 import MenuIcon from '@mui/icons-material/Menu'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 import { clearToken } from '@/utils/auth'
-import { ordersApi } from '@/api/orders'
-import { PENDING_POLL_MS, pendingTitle } from '@/utils/pendingOrders'
+import { useOrders, useOrderSync } from '@/hooks/useOrders'
+import { countPending } from '@/utils/orderSync'
+import { pendingTitle } from '@/utils/pendingOrders'
 
 const drawerWidth = 240
 
@@ -46,24 +47,15 @@ export default function DashboardLayout() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
 
-  // New orders show up without a page reload: the Pending count is checked every minute,
-  // even in a background tab, and a change refreshes the order lists too
-  const { data: pendingCount = 0 } = useQuery({
-    queryKey: ['orders', 'pending-count'],
-    queryFn: ordersApi.pendingCount,
-    refetchInterval: PENDING_POLL_MS,
-    refetchIntervalInBackground: true,
-    staleTime: 0,
-  })
-  const lastPending = useRef<number | null>(null)
+  // Orders changed anywhere (new orders, cancels, edits on another device) are merged in
+  // every minute without a page reload; the badge and tab title count the Pending ones
+  useOrderSync()
+  const { data: orders } = useOrders()
+  const pendingCount = orders ? countPending(orders) : 0
 
   useEffect(() => {
     document.title = pendingTitle(pendingCount)
-    if (lastPending.current !== null && lastPending.current !== pendingCount) {
-      queryClient.invalidateQueries({ queryKey: ['orders'], exact: true })
-    }
-    lastPending.current = pendingCount
-  }, [pendingCount, queryClient])
+  }, [pendingCount])
 
   const logout = () => {
     clearToken()

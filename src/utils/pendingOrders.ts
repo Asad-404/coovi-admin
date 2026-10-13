@@ -1,6 +1,3 @@
-// How often the admin checks for new orders while it is open (also in a background tab)
-export const PENDING_POLL_MS = 60_000
-
 const BASE_TITLE = 'Coovi Admin'
 
 // "(3) Coovi Admin" in the browser tab while orders wait for confirmation
