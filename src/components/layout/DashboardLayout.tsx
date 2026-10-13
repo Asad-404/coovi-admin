@@ -23,6 +23,7 @@ import ReceiptLongIcon from '@mui/icons-material/ReceiptLong'
 import LogoutIcon from '@mui/icons-material/Logout'
 import LockResetIcon from '@mui/icons-material/LockReset'
 import MenuIcon from '@mui/icons-material/Menu'
+import SettingsIcon from '@mui/icons-material/Settings'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 import { clearToken } from '@/utils/auth'
 
@@ -32,6 +33,7 @@ const navItems = [
   { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Products', to: '/products', icon: <Inventory2Icon /> },
   { label: 'Orders', to: '/orders', icon: <ReceiptLongIcon /> },
+  { label: 'Settings', to: '/settings', icon: <SettingsIcon /> },
 ]
 
 export default function DashboardLayout() {
