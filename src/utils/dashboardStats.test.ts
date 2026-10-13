@@ -30,6 +30,12 @@ describe('lowStockProducts', () => {
     ])
     expect(list.map((p) => p._id)).toEqual(['c', 'a'])
   })
+
+  it('uses the low-stock limit saved in settings when given', () => {
+    const products = [makeProduct({ _id: 'a', stock: 5 }), makeProduct({ _id: 'b', stock: 12 })]
+    expect(lowStockProducts(products, 3).map((p) => p._id)).toEqual([])
+    expect(lowStockProducts(products, 15).map((p) => p._id)).toEqual(['a', 'b'])
+  })
 })
 
 describe('dailyRevenue', () => {

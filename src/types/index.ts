@@ -66,6 +66,12 @@ export interface StatusChange {
   restock?: boolean
 }
 
+// The admin's cached order list and the server clock it was fetched at (see utils/orderSync.ts)
+export interface OrderList {
+  orders: Order[]
+  serverTime?: string
+}
+
 // Fields an admin may correct on an existing order
 export type OrderDetailsUpdate = Partial<Pick<Order, 'customerName' | 'phone' | 'address' | 'notes'>>
 
@@ -86,4 +92,14 @@ export interface AuthResponse {
     name: string
     role: string
   }
+}
+
+// GET /settings/admin — shop-wide settings the owner edits on the Settings page
+export interface ShopSettings {
+  whatsappNumber: string // 8801XXXXXXXXX
+  supportPhone: string // 01XXXXXXXXX or ''
+  announcementText: string
+  announcementActive: boolean
+  lowStockThreshold: number
+  updatedAt?: string
 }

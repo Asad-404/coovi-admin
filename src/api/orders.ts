@@ -1,12 +1,23 @@
 import apiClient from './client.ts'
-import { fetchAllPages } from './paginate.ts'
-import type { Order, OrderDetailsUpdate, StatusChange } from '@/types'
+import { fetchAllPagesWithTime } from './paginate.ts'
+import type { Order, OrderDetailsUpdate, OrderList, StatusChange } from '@/types'
 
 const ORDER_PAGE_SIZE = 100
 
 export const ordersApi = {
-  // GET /orders -> { success, data: [...], pagination } (admin JWT required) — every page
-  getAll: (): Promise<Order[]> => fetchAllPages<Order>('/orders', ORDER_PAGE_SIZE),
+  // GET /orders -> { success, data: [...], serverTime, pagination } (admin JWT required) — every page
+  getAll: async (): Promise<OrderList> => {
+    const { items, serverTime } = await fetchAllPagesWithTime<Order>('/orders', ORDER_PAGE_SIZE)
+    return { orders: items, serverTime }
+  },
+
+  // GET /orders?updatedSince=<time> -> only orders created or changed since then (usually none)
+  getChangedSince: async (since: string): Promise<OrderList> => {
+    const { items, serverTime } = await fetchAllPagesWithTime<Order>('/orders', ORDER_PAGE_SIZE, {
+      updatedSince: since,
+    })
+    return { orders: items, serverTime }
+  },
 
   // PATCH /orders/:id -> { success, data: order } — contact details only; the API
   // refuses items/totals and freezes Delivered/Cancelled/Returned orders
