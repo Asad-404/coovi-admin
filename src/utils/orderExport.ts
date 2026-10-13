@@ -1,6 +1,7 @@
 import type { Order } from '@/types'
 import { formatDate, formatPrice } from '@/utils/format'
 import { itemLabel } from '@/utils/preorder'
+import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 
 // A cell starting with = + - @ can run as a formula when the CSV is opened in Excel, so it is prefixed with a quote.
 const csvCell = (value: string | number): string => {
@@ -18,11 +19,13 @@ export const ordersToCsv = (orders: Order[]): string => {
     'Address',
     'Items',
     'Subtotal',
+    'Discount',
     'Delivery',
     'Total',
     'Status',
     'Payment',
     'Notes',
+    'Source',
   ]
   const rows = orders.map((order) => [
     order.orderNumber,
@@ -32,11 +35,13 @@ export const ordersToCsv = (orders: Order[]): string => {
     order.address,
     order.items.map((item) => `${itemLabel(item)} x${item.quantity}`).join('; '),
     order.subtotal,
+    order.discount ?? 0,
     order.deliveryFee,
     order.total,
     order.status,
     order.paymentMethod,
     order.notes ?? '',
+    SOURCE_LABELS[orderSource(order)],
   ])
   // Leading BOM so Excel reads Bengali names and addresses correctly
   return '﻿' + [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
@@ -90,7 +95,8 @@ export const printOrderSlip = (order: Order): void => {
     <thead><tr><th>Saree</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Amount</th></tr></thead>
     <tbody>${rows}
       <tr><td colspan="3" class="num">Subtotal</td><td class="num">${escapeHtml(formatPrice(order.subtotal))}</td></tr>
-      <tr><td colspan="3" class="num">Delivery</td><td class="num">${escapeHtml(formatPrice(order.deliveryFee))}</td></tr>
+${order.discount ? `      <tr><td colspan="3" class="num">Discount</td><td class="num">-${escapeHtml(formatPrice(order.discount))}</td></tr>
+` : ''}      <tr><td colspan="3" class="num">Delivery</td><td class="num">${escapeHtml(formatPrice(order.deliveryFee))}</td></tr>
       <tr class="total"><td colspan="3" class="num">Total to collect</td><td class="num">${escapeHtml(formatPrice(order.total))}</td></tr>
     </tbody>
   </table>

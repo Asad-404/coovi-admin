@@ -4,6 +4,7 @@ import ErrorBoundary from '@/components/ErrorBoundary.tsx'
 import DashboardLayout from '@/components/layout/DashboardLayout.tsx'
 import DashboardPage from '@/pages/DashboardPage.tsx'
 import LoginPage from '@/pages/LoginPage.tsx'
+import OrderFormPage from '@/pages/OrderFormPage.tsx'
 import OrdersPage from '@/pages/OrdersPage.tsx'
 import ProductFormPage from '@/pages/ProductFormPage.tsx'
 import ProductsPage from '@/pages/ProductsPage.tsx'
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="/products/new" element={<ProductFormPage />} />
           <Route path="/products/:slug/edit" element={<ProductFormPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/new" element={<OrderFormPage />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
