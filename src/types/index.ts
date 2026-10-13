@@ -1,6 +1,8 @@
 // Types matching the REAL coovi-api responses (see API_ENDPOINTS.md)
 
-export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Returned'
+
+export type RefundMethod = 'bKash' | 'Nagad' | 'Cash' | 'Bank transfer' | 'Store credit'
 
 export interface Product {
   _id: string
@@ -49,8 +51,26 @@ export interface Order {
   paymentMethod: string
   status: OrderStatus
   notes?: string
+  // Why it was cancelled or came back
+  cancelReason?: string
+  deliveredAt?: string
+  returnedAt?: string
+  // Whether the returned items went back into stock
+  restocked?: boolean
+  refundAmount?: number
+  refundMethod?: RefundMethod
   createdAt: string
   updatedAt: string
+}
+
+// Body of PATCH /orders/:id/status. reason is required for Returned;
+// restock and refund only apply to Returned (refund only after delivery)
+export interface StatusChange {
+  status: OrderStatus
+  reason?: string
+  restock?: boolean
+  refundAmount?: number
+  refundMethod?: RefundMethod
 }
 
 // Fields an admin may correct on an existing order

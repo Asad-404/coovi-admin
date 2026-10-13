@@ -8,6 +8,7 @@ describe('revenueOf', () => {
       makeOrder({ total: 1000, status: 'Delivered' }),
       makeOrder({ total: 500, status: 'Pending' }),
       makeOrder({ total: 9999, status: 'Cancelled' }),
+      makeOrder({ total: 8888, status: 'Returned' }),
     ]
     expect(revenueOf(orders)).toBe(1500)
   })
@@ -16,7 +17,7 @@ describe('revenueOf', () => {
 describe('countByStatus', () => {
   it('counts every status, including zero', () => {
     const counts = countByStatus([makeOrder({ status: 'Pending' }), makeOrder({ status: 'Pending' }), makeOrder({ status: 'Shipped' })])
-    expect(counts).toEqual({ Pending: 2, Processing: 0, Shipped: 1, Delivered: 0, Cancelled: 0 })
+    expect(counts).toEqual({ Pending: 2, Processing: 0, Shipped: 1, Delivered: 0, Cancelled: 0, Returned: 0 })
   })
 })
 
