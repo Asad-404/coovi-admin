@@ -12,8 +12,8 @@ export const countByStatus = (orders: Order[]): Record<OrderStatus, number> => {
   return counts
 }
 
-export const lowStockProducts = (products: Product[]): Product[] =>
-  products.filter((p) => p.stock < LOW_STOCK_THRESHOLD).sort((a, b) => a.stock - b.stock)
+export const lowStockProducts = (products: Product[], threshold = LOW_STOCK_THRESHOLD): Product[] =>
+  products.filter((p) => p.stock < threshold).sort((a, b) => a.stock - b.stock)
 
 export interface DailyRevenue {
   date: string // yyyy-mm-dd, local time

@@ -1,4 +1,6 @@
-import type { Order } from '@/types'
+import type { DeliveryArea, Order } from '@/types'
+import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
+import { formatPrice } from '@/utils/format'
 
 export type TimelineEntry =
   | { kind: 'note'; id: string; at: string; by: string; text: string }
@@ -10,9 +12,19 @@ const FIELD_LABELS: Record<string, string> = {
   phone: 'Phone',
   address: 'Address',
   notes: 'Customer note',
+  district: 'District',
+  deliveryArea: 'Delivery area',
+  deliveryFee: 'Delivery fee',
+  total: 'Total',
 }
 
-const shown = (value?: string) => (value ? `"${value}"` : '(empty)')
+// Values arrive as text; show areas and money the way the rest of the admin does
+const shown = (field: string, value?: string) => {
+  if (!value) return '(empty)'
+  if (field === 'deliveryArea') return DELIVERY_AREA_LABELS[value as DeliveryArea] ?? value
+  if (field === 'deliveryFee' || field === 'total') return formatPrice(Number(value))
+  return `"${value}"`
+}
 
 // Notes, status changes and detail edits in one list, newest first
 export const buildTimeline = (order: Order): TimelineEntry[] => {
@@ -31,7 +43,7 @@ export const buildTimeline = (order: Order): TimelineEntry[] => {
       at: e.at,
       by: e.by,
       text: `Edited ${e.changes.map((c) => FIELD_LABELS[c.field] ?? c.field).join(', ').toLowerCase()}`,
-      details: e.changes.map((c) => `${FIELD_LABELS[c.field] ?? c.field}: ${shown(c.from)} → ${shown(c.to)}`),
+      details: e.changes.map((c) => `${FIELD_LABELS[c.field] ?? c.field}: ${shown(c.field, c.from)} → ${shown(c.field, c.to)}`),
     })),
   ]
 

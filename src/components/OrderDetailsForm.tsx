@@ -1,11 +1,24 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Alert, Button, CircularProgress, Stack, TextField } from '@mui/material'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Alert,
+  Button,
+  CircularProgress,
+  FormControlLabel,
+  MenuItem,
+  Radio,
+  RadioGroup,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
 import { ordersApi } from '@/api/orders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
-import type { Order, OrderDetailsUpdate } from '@/types'
+import type { DeliveryArea, Order, OrderDetailsUpdate } from '@/types'
+import { orderArea } from '@/utils/deliveryArea'
+import { formatPrice } from '@/utils/format'
 
 interface OrderDetailsFormProps {
   order: Order
@@ -20,7 +33,26 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
   const [phone, setPhone] = useState(order.phone)
   const [address, setAddress] = useState(order.address)
   const [notes, setNotes] = useState(order.notes ?? '')
+  const [district, setDistrict] = useState(order.district ?? '')
+  const [area, setArea] = useState<DeliveryArea>(orderArea(order))
   const [error, setError] = useState('')
+
+  // The API only lets the district and area change before the order is confirmed
+  const canChangeDelivery = order.status === 'Pending'
+  const { data: deliveryOptions } = useQuery({
+    queryKey: ['delivery-options'],
+    queryFn: ordersApi.getDeliveryOptions,
+    enabled: canChangeDelivery,
+    staleTime: 60_000,
+  })
+  const areaChanged = area !== orderArea(order)
+  const newFee = deliveryOptions?.zones[area]
+
+  const changeDistrict = (value: string) => {
+    setDistrict(value)
+    // Only Dhaka district can be inside Dhaka; picking Dhaka starts at the city
+    setArea(value === 'Dhaka' ? 'inside_dhaka' : 'outside_dhaka')
+  }
 
   const mutation = useMutation({
     mutationFn: (changes: OrderDetailsUpdate) => ordersApi.updateDetails(order._id, changes),
@@ -46,6 +78,8 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
     if (phone !== order.phone) changes.phone = phone
     if (address.trim() !== order.address) changes.address = address.trim()
     if (notes.trim() !== (order.notes ?? '')) changes.notes = notes.trim()
+    if (district && district !== (order.district ?? '')) changes.district = district
+    if (areaChanged) changes.deliveryArea = area
 
     if (Object.keys(changes).length === 0) return onDone()
     mutation.mutate(changes)
@@ -84,6 +118,37 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
         size="small"
         slotProps={{ htmlInput: { maxLength: 500 } }}
       />
+      {canChangeDelivery && (
+        <Stack spacing={1}>
+          <TextField
+            select
+            label="District"
+            value={district}
+            onChange={(e) => changeDistrict(e.target.value)}
+            size="small"
+            disabled={!deliveryOptions}
+            helperText={order.district ? undefined : 'This order was placed before districts existed'}
+          >
+            {(deliveryOptions?.districts ?? []).map((name) => (
+              <MenuItem key={name} value={name}>
+                {name}
+              </MenuItem>
+            ))}
+          </TextField>
+          {district === 'Dhaka' && (
+            <RadioGroup row value={area} onChange={(e) => setArea(e.target.value as DeliveryArea)}>
+              <FormControlLabel value="inside_dhaka" control={<Radio size="small" />} label="Dhaka city" />
+              <FormControlLabel value="outside_dhaka" control={<Radio size="small" />} label="Dhaka suburbs" />
+            </RadioGroup>
+          )}
+          {areaChanged && newFee !== undefined && (
+            <Typography variant="body2" color="warning.main">
+              The delivery fee will change from {formatPrice(order.deliveryFee)} to {formatPrice(newFee)}, so the
+              total becomes {formatPrice(order.subtotal - (order.discount ?? 0) + newFee)}.
+            </Typography>
+          )}
+        </Stack>
+      )}
       <TextField
         label="Notes"
         value={notes}

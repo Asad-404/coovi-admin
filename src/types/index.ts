@@ -2,6 +2,20 @@
 
 export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
 
+// Only Dhaka city is inside Dhaka; Dhaka suburbs and every other district are outside
+export type DeliveryArea = 'inside_dhaka' | 'outside_dhaka'
+
+// GET /orders/delivery-fee: the fee per area and the districts checkout offers
+export interface DeliveryOptions {
+  deliveryFee: number
+  zones: Record<DeliveryArea, number>
+  districts: string[]
+}
+
+// Where an order came from: the storefront checkout, or entered by an admin
+export type OrderSource = 'website' | 'facebook' | 'whatsapp' | 'phone' | 'other'
+export type ManualOrderSource = Exclude<OrderSource, 'website'>
+
 export interface Product {
   _id: string
   slug: string
@@ -66,18 +80,39 @@ export interface Order {
   customerName: string
   phone: string
   address: string
+  // Missing on orders placed before delivery areas existed (those paid the inside-Dhaka fee)
+  district?: string
+  deliveryArea?: DeliveryArea
   items: OrderItem[]
   subtotal: number
+  // Taka off the items, agreed on a manual order (0 or missing for website orders)
+  discount?: number
   deliveryFee: number
   total: number
   paymentMethod: string
   status: OrderStatus
   notes?: string
+  // Missing on orders from an API before manual order entry: treat as 'website'
+  source?: OrderSource
+  // Email of the admin who entered a manual order
+  createdBy?: string
   internalNotes?: OrderNote[]
   statusHistory?: StatusChange[]
   editHistory?: DetailEdit[]
   createdAt: string
   updatedAt: string
+}
+
+// POST /orders/manual body: items and quantities only, the API prices them
+export interface ManualOrderInput {
+  customerName: string
+  phone: string
+  address: string
+  notes?: string
+  source: ManualOrderSource
+  items: { productId: string; quantity: number }[]
+  deliveryFeeOverride?: number
+  discount?: number
 }
 
 // The admin's cached order list and the server clock it was fetched at (see utils/orderSync.ts)
@@ -87,7 +122,9 @@ export interface OrderList {
 }
 
 // Fields an admin may correct on an existing order
-export type OrderDetailsUpdate = Partial<Pick<Order, 'customerName' | 'phone' | 'address' | 'notes'>>
+export type OrderDetailsUpdate = Partial<
+  Pick<Order, 'customerName' | 'phone' | 'address' | 'notes' | 'district' | 'deliveryArea'>
+>
 
 export interface Admin {
   _id: string
@@ -106,4 +143,14 @@ export interface AuthResponse {
     name: string
     role: string
   }
+}
+
+// GET /settings/admin — shop-wide settings the owner edits on the Settings page
+export interface ShopSettings {
+  whatsappNumber: string // 8801XXXXXXXXX
+  supportPhone: string // 01XXXXXXXXX or ''
+  announcementText: string
+  announcementActive: boolean
+  lowStockThreshold: number
+  updatedAt?: string
 }

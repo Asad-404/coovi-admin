@@ -33,6 +33,26 @@ describe('buildTimeline', () => {
     expect(timeline[3]).toMatchObject({ text: 'Order placed', by: 'customer' })
   })
 
+  it('shows delivery areas and money in words', () => {
+    const order = makeOrder({
+      editHistory: [
+        {
+          _id: 'e1',
+          changes: [
+            { field: 'deliveryArea', from: 'inside_dhaka', to: 'outside_dhaka' },
+            { field: 'deliveryFee', from: '70', to: '130' },
+          ],
+          by: 'admin@coovi.com',
+          at: '2026-10-01T13:00:00.000Z',
+        },
+      ],
+    })
+    expect(buildTimeline(order)[0]).toMatchObject({
+      text: 'Edited delivery area, delivery fee',
+      details: ['Delivery area: Inside Dhaka → Outside Dhaka', 'Delivery fee: ৳70 → ৳130'],
+    })
+  })
+
   it('shows when an older order without history was placed', () => {
     const timeline = buildTimeline(makeOrder())
     expect(timeline).toEqual([

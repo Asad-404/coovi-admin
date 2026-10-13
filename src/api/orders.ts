@@ -1,6 +1,6 @@
 import apiClient from './client.ts'
 import { fetchAllPagesWithTime } from './paginate.ts'
-import type { Order, OrderDetailsUpdate, OrderList, OrderStatus } from '@/types'
+import type { DeliveryOptions, ManualOrderInput, Order, OrderDetailsUpdate, OrderList, OrderStatus } from '@/types'
 
 const ORDER_PAGE_SIZE = 100
 
@@ -19,8 +19,28 @@ export const ordersApi = {
     return { orders: items, serverTime }
   },
 
-  // PATCH /orders/:id -> { success, data: order } — contact details only; the API
-  // refuses items/totals and freezes Delivered/Cancelled orders
+  // POST /orders/manual -> { success, data: order } — an order taken by Facebook, WhatsApp
+  // or phone. The API prices the items from the database and returns the real totals.
+  createManual: async (input: ManualOrderInput): Promise<Order> => {
+    const res = await apiClient.post('/orders/manual', input)
+    return res.data.data
+  },
+
+  // GET /orders/delivery-fee -> { success, data: { deliveryFee } } — the fee checkout charges
+  getDeliveryFee: async (): Promise<number> => {
+    const res = await apiClient.get('/orders/delivery-fee')
+    return res.data.data.deliveryFee
+  },
+
+  // GET /orders/delivery-fee -> { success, data: { deliveryFee, zones, districts } } (public)
+  getDeliveryOptions: async (): Promise<DeliveryOptions> => {
+    const res = await apiClient.get('/orders/delivery-fee')
+    return res.data.data
+  },
+
+  // PATCH /orders/:id -> { success, data: order } — contact and delivery details only;
+  // the API refuses items/totals, freezes Delivered/Cancelled orders, allows district
+  // and area only while Pending, and recomputes the fee and total itself
   updateDetails: async (id: string, details: OrderDetailsUpdate): Promise<Order> => {
     const res = await apiClient.patch(`/orders/${id}`, details)
     return res.data.data
