@@ -20,7 +20,7 @@ import {
 } from '@mui/material'
 import type { ReactNode } from 'react'
 import { authApi } from '@/api/auth'
-import { ordersApi } from '@/api/orders'
+import { useOrders } from '@/hooks/useOrders'
 import { productsApi } from '@/api/products'
 import RevenueChart from '@/components/RevenueChart'
 import { LOW_STOCK_THRESHOLD } from '@/constants'
@@ -64,10 +64,7 @@ export default function DashboardPage() {
     queryFn: authApi.me,
   })
 
-  const { data: orders, isLoading: ordersLoading } = useQuery({
-    queryKey: ['orders'],
-    queryFn: ordersApi.getAll,
-  })
+  const { data: orders, isLoading: ordersLoading } = useOrders()
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
