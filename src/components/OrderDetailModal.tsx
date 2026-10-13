@@ -17,6 +17,7 @@ import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
+import CourierSection from '@/components/CourierSection'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
 import { printOrderSlip } from '@/utils/orderExport'
@@ -55,6 +56,8 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
             </Typography>
             <Chip label={order.status} color={statusColor[order.status]} />
           </div>
+
+          <CourierSection order={order} />
 
           {/* Customer Info */}
           <div>

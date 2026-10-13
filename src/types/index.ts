@@ -35,6 +35,17 @@ export interface OrderItem {
   preorderDays?: number
 }
 
+// The parcel booked with Steadfast. status is the courier's own delivery
+// status (in_review, pending, hold, delivered, cancelled, ...)
+export interface OrderCourier {
+  name?: 'Steadfast'
+  consignmentId?: number
+  trackingCode?: string
+  status?: string
+  bookedAt?: string
+  statusCheckedAt?: string
+}
+
 // NOTE: address is a plain string in the real API (not an object)
 export interface Order {
   _id: string
@@ -49,6 +60,7 @@ export interface Order {
   paymentMethod: string
   status: OrderStatus
   notes?: string
+  courier?: OrderCourier
   createdAt: string
   updatedAt: string
 }

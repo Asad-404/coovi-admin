@@ -23,6 +23,7 @@ export const ordersToCsv = (orders: Order[]): string => {
     'Status',
     'Payment',
     'Notes',
+    'Tracking code',
   ]
   const rows = orders.map((order) => [
     order.orderNumber,
@@ -37,6 +38,7 @@ export const ordersToCsv = (orders: Order[]): string => {
     order.status,
     order.paymentMethod,
     order.notes ?? '',
+    order.courier?.trackingCode ?? '',
   ])
   // Leading BOM so Excel reads Bengali names and addresses correctly
   return '﻿' + [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n')
@@ -81,7 +83,7 @@ export const printOrderSlip = (order: Order): void => {
 </style></head><body>
   <div class="row">
     <div><h1>Coovi</h1><div>Order slip</div></div>
-    <div style="text-align:right"><strong>${escapeHtml(order.orderNumber)}</strong><br>${escapeHtml(formatDate(order.createdAt))}<br>Status: ${escapeHtml(order.status)}</div>
+    <div style="text-align:right"><strong>${escapeHtml(order.orderNumber)}</strong><br>${escapeHtml(formatDate(order.createdAt))}<br>Status: ${escapeHtml(order.status)}${order.courier?.trackingCode ? `<br>Steadfast: ${escapeHtml(order.courier.trackingCode)}` : ''}</div>
   </div>
   <h2>Deliver to</h2>
   <div class="box"><strong>${escapeHtml(order.customerName)}</strong><br>${escapeHtml(order.phone)}<br>${escapeHtml(order.address)}${order.notes ? `<br><em>Note: ${escapeHtml(order.notes)}</em>` : ''}</div>

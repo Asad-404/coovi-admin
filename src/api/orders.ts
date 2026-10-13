@@ -20,4 +20,17 @@ export const ordersApi = {
     const res = await apiClient.patch(`/orders/${id}/status`, { status })
     return res.data.data
   },
+
+  // POST /orders/:id/courier/steadfast -> { success, data: order } — books the
+  // parcel with Steadfast; the API decides the cash to collect
+  bookSteadfast: async (id: string): Promise<Order> => {
+    const res = await apiClient.post(`/orders/${id}/courier/steadfast`)
+    return res.data.data
+  },
+
+  // POST /orders/:id/courier/steadfast/refresh -> { success, data: order }
+  refreshSteadfast: async (id: string): Promise<Order> => {
+    const res = await apiClient.post(`/orders/${id}/courier/steadfast/refresh`)
+    return res.data.data
+  },
 }

@@ -300,6 +300,12 @@ export default function OrdersPage() {
             {cancelTarget?.customerName}'s order will be cancelled. This can't be undone.
             {cancelTarget?.status === 'Processing' && ' Its items will be returned to stock.'}
           </Typography>
+          {cancelTarget?.courier?.trackingCode && (
+            <Alert severity="warning" sx={{ mt: 2 }}>
+              This parcel is booked with Steadfast (tracking code {cancelTarget.courier.trackingCode}).
+              Cancelling here does not cancel it at Steadfast: cancel it in the Steadfast merchant portal too.
+            </Alert>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setCancelTarget(null)} disabled={statusMutation.isPending}>
