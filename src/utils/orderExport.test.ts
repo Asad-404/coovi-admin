@@ -15,12 +15,9 @@ describe('ordersToCsv', () => {
     expect(row).toContain('"say ""hi"""')
   })
 
-  it('adds the cancel or return reason and the refund', () => {
-    const csv = ordersToCsv([
-      makeOrder({ status: 'Returned', cancelReason: 'Changed mind', refundAmount: 3000, refundMethod: 'bKash' }),
-    ])
+  it('adds the cancel or return reason', () => {
+    const csv = ordersToCsv([makeOrder({ status: 'Returned', cancelReason: 'Customer refused the parcel' })])
     const row = csv.split('\r\n')[1]
-    expect(row).toContain('"Changed mind"')
-    expect(row).toContain('"3000 (bKash)"')
+    expect(row).toContain('"Customer refused the parcel"')
   })
 })

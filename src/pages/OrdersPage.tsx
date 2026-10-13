@@ -286,11 +286,11 @@ export default function OrdersPage() {
       <Typography variant="body2" color="text.secondary">
         Orders move forward only: Pending → Processing → Shipped → Delivered, or Cancelled from
         Pending/Processing. Pending → Processing takes the items out of stock; Processing → Cancelled
-        puts them back. A parcel refused at the door is Shipped → Returned, and a return after delivery
-        is Delivered → Returned; both put the items back unless you untick it.
+        puts them back. A parcel refused at the door is Shipped → Returned, which puts the items back unless
+        you untick it. Delivered is final: the shop takes no returns after delivery.
       </Typography>
 
-      {/* Cancel or return: asks for the reason, restock and refund */}
+      {/* Cancel or mark returned: asks for the reason and restock */}
       <StatusChangeDialog
         key={pendingChange ? `${pendingChange.order._id}-${pendingChange.status}` : 'closed'}
         order={pendingChange?.order ?? null}

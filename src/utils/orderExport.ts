@@ -22,7 +22,6 @@ export const ordersToCsv = (orders: Order[]): string => {
     'Total',
     'Status',
     'Reason',
-    'Refund',
     'Payment',
     'Notes',
   ]
@@ -38,7 +37,6 @@ export const ordersToCsv = (orders: Order[]): string => {
     order.total,
     order.status,
     order.cancelReason ?? '',
-    order.refundAmount ? `${order.refundAmount} (${order.refundMethod ?? ''})` : '',
     order.paymentMethod,
     order.notes ?? '',
   ])

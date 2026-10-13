@@ -75,15 +75,6 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                       <TableCell>{order.restocked ? 'Put back in stock' : 'Not put back'}</TableCell>
                     </TableRow>
                   )}
-                  {order.refundAmount ? (
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'medium' }}>Refund</TableCell>
-                      <TableCell>
-                        {formatPrice(order.refundAmount)}
-                        {order.refundMethod ? ` by ${order.refundMethod}` : ''}
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
                 </TableBody>
               </Table>
             )}
