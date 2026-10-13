@@ -31,7 +31,7 @@ import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
-import { LOW_STOCK_THRESHOLD } from '@/constants'
+import { useLowStockThreshold } from '@/api/settings'
 import { useNotify } from '@/notify/context'
 import { formatPrice } from '@/utils/format'
 import { categoriesOf, filterProducts } from '@/utils/productFilters'
@@ -62,6 +62,8 @@ export default function ProductsPage() {
     queryFn: productsApi.getAll,
   })
 
+  const lowStockThreshold = useLowStockThreshold()
+
   const deleteMutation = useMutation({
     mutationFn: (id: string) => productsApi.remove(id),
     onSuccess: () => {
@@ -82,7 +84,7 @@ export default function ProductsPage() {
     }
   }
 
-  const visible = products ? filterProducts(products, { search, category, stock, sort }) : undefined
+  const visible = products ? filterProducts(products, { search, category, stock, sort }, lowStockThreshold) : undefined
   const categories = products ? categoriesOf(products) : []
   const hasFilters = Boolean(search || category || stock !== 'all')
 
@@ -125,7 +127,7 @@ export default function ProductsPage() {
         </Select>
         <Select value={stock} onChange={(e) => setStock(e.target.value as StockFilter)} size="small" sx={{ minWidth: 150 }}>
           <MenuItem value="all">Any stock</MenuItem>
-          <MenuItem value="low">Low stock (&lt; {LOW_STOCK_THRESHOLD})</MenuItem>
+          <MenuItem value="low">Low stock (&lt; {lowStockThreshold})</MenuItem>
           <MenuItem value="out">Out of stock</MenuItem>
         </Select>
         <Select value={sort} onChange={(e) => setSort(e.target.value as ProductSort)} size="small" sx={{ minWidth: 170 }}>
@@ -201,7 +203,7 @@ export default function ProductsPage() {
                         <Chip
                           size="small"
                           label={`${product.stock} in stock`}
-                          color={product.stock === 0 ? 'error' : product.stock < LOW_STOCK_THRESHOLD ? 'warning' : 'success'}
+                          color={product.stock === 0 ? 'error' : product.stock < lowStockThreshold ? 'warning' : 'success'}
                         />
                         {/* Switched off in the form: the shop shows it as out of stock and the API refuses orders */}
                         {!product.inStock && <Chip size="small" variant="outlined" label="Not for sale" />}

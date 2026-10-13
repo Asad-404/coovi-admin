@@ -23,7 +23,7 @@ import { authApi } from '@/api/auth'
 import { useOrders } from '@/hooks/useOrders'
 import { productsApi } from '@/api/products'
 import RevenueChart from '@/components/RevenueChart'
-import { LOW_STOCK_THRESHOLD } from '@/constants'
+import { useLowStockThreshold } from '@/api/settings'
 import { countByStatus, dailyRevenue, lowStockProducts, revenueOf } from '@/utils/dashboardStats'
 import { formatPrice } from '@/utils/format'
 import { STATUSES, statusColor } from '@/utils/orderStatus'
@@ -71,10 +71,12 @@ export default function DashboardPage() {
     queryFn: productsApi.getAll,
   })
 
+  const lowStockThreshold = useLowStockThreshold()
+
   const allOrders = orders ?? []
   const totalRevenue = revenueOf(allOrders)
   const ordersByStatus = countByStatus(allOrders)
-  const lowStockList = lowStockProducts(products ?? [])
+  const lowStockList = lowStockProducts(products ?? [], lowStockThreshold)
   const daily = dailyRevenue(allOrders, range)
   const rangeRevenue = daily.reduce((sum, d) => sum + d.revenue, 0)
 
@@ -144,7 +146,7 @@ export default function DashboardPage() {
                 {lowStockList.length}
               </Typography>
             }
-            hint={`Fewer than ${LOW_STOCK_THRESHOLD} left`}
+            hint={`Fewer than ${lowStockThreshold} left`}
             onClick={() => navigate('/products?stock=low')}
           />
         </Grid>
