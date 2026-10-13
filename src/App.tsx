@@ -4,9 +4,11 @@ import ErrorBoundary from '@/components/ErrorBoundary.tsx'
 import DashboardLayout from '@/components/layout/DashboardLayout.tsx'
 import DashboardPage from '@/pages/DashboardPage.tsx'
 import LoginPage from '@/pages/LoginPage.tsx'
+import OrderFormPage from '@/pages/OrderFormPage.tsx'
 import OrdersPage from '@/pages/OrdersPage.tsx'
 import ProductFormPage from '@/pages/ProductFormPage.tsx'
 import ProductsPage from '@/pages/ProductsPage.tsx'
+import SettingsPage from '@/pages/SettingsPage.tsx'
 import { hasUsableToken } from '@/utils/auth'
 
 // Client-side guard: hides the dashboard pages when no unexpired token is stored.
@@ -37,6 +39,8 @@ export default function App() {
           <Route path="/products/new" element={<ProductFormPage />} />
           <Route path="/products/:slug/edit" element={<ProductFormPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/orders/new" element={<OrderFormPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
