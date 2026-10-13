@@ -17,10 +17,13 @@ import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
+import OrderTimeline from '@/components/OrderTimeline'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
+import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 import { printOrderSlip } from '@/utils/orderExport'
 import { formatDate, formatPrice } from '@/utils/format'
+import { describeDelivery } from '@/utils/deliveryArea'
 
 interface OrderDetailModalProps {
   order: Order | null
@@ -109,6 +112,10 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                   <TableCell sx={{ fontWeight: 'medium' }}>Address</TableCell>
                   <TableCell>{order.address}</TableCell>
                 </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'medium' }}>Delivery area</TableCell>
+                  <TableCell>{describeDelivery(order)}</TableCell>
+                </TableRow>
                 {order.notes && (
                   <TableRow>
                     <TableCell sx={{ fontWeight: 'medium' }}>Notes</TableCell>
@@ -165,6 +172,12 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                   <TableCell sx={{ fontWeight: 'medium' }}>Subtotal</TableCell>
                   <TableCell align="right">{formatPrice(order.subtotal)}</TableCell>
                 </TableRow>
+                {Boolean(order.discount) && (
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 'medium' }}>Discount</TableCell>
+                    <TableCell align="right">-{formatPrice(order.discount ?? 0)}</TableCell>
+                  </TableRow>
+                )}
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'medium' }}>Delivery Fee</TableCell>
                   <TableCell align="right">{formatPrice(order.deliveryFee)}</TableCell>
@@ -191,9 +204,20 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
                   <TableCell sx={{ fontWeight: 'medium' }}>Order Date</TableCell>
                   <TableCell>{formatDate(order.createdAt)}</TableCell>
                 </TableRow>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'medium' }}>Source</TableCell>
+                  <TableCell>
+                    {SOURCE_LABELS[orderSource(order)]}
+                    {order.createdBy && ` (entered by ${order.createdBy})`}
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>
+
+          <Divider />
+
+          <OrderTimeline order={order} />
         </Stack>
       </DialogContent>
       <DialogActions>

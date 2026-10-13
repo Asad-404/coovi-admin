@@ -13,7 +13,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import type { Order, StatusChange } from '@/types'
+import type { Order, StatusUpdate } from '@/types'
 import { CANCEL_REASONS } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
 
@@ -25,7 +25,7 @@ interface StatusChangeDialogProps {
   status: 'Cancelled' | 'Returned'
   saving: boolean
   onClose: () => void
-  onConfirm: (change: StatusChange) => void
+  onConfirm: (change: StatusUpdate) => void
 }
 
 // Asks why an order is cancelled or its parcel came back, and whether a
@@ -45,7 +45,7 @@ export default function StatusChangeDialog({ order, status, saving, onClose, onC
   const missingReason = (returning || reason === OTHER) && !finalReason
 
   const confirm = () => {
-    const change: StatusChange = { status }
+    const change: StatusUpdate = { status }
     if (finalReason) change.reason = finalReason
     if (returning) change.restock = restock
     onConfirm(change)
