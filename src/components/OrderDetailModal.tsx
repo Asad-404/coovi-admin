@@ -112,7 +112,18 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
               <TableBody>
                 {order.items.map((item, index) => (
                   <TableRow key={index}>
-                    <TableCell>{item.name}</TableCell>
+                    <TableCell>
+                      {item.name}
+                      {item.preorder && (
+                        <Chip
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                          label={item.preorderDays ? `Pre-order, about ${item.preorderDays} days` : 'Pre-order'}
+                          sx={{ ml: 1 }}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell align="right">
                       {formatPrice(item.price)} × {item.quantity}
                     </TableCell>

@@ -26,6 +26,9 @@ export interface Product {
   category: string
   stock: number
   inStock: boolean
+  // Out of stock pre-orders: allowed when on, shipping in about preorderDays
+  allowPreorder?: boolean
+  preorderDays?: number
   createdAt: string
   updatedAt: string
 }
@@ -37,6 +40,9 @@ export interface OrderItem {
   quantity: number
   image: string
   size?: string
+  // Sourced for this customer: took no stock, ships in about preorderDays
+  preorder?: boolean
+  preorderDays?: number
 }
 
 // NOTE: address is a plain string in the real API (not an object)
@@ -58,6 +64,12 @@ export interface Order {
   notes?: string
   createdAt: string
   updatedAt: string
+}
+
+// The admin's cached order list and the server clock it was fetched at (see utils/orderSync.ts)
+export interface OrderList {
+  orders: Order[]
+  serverTime?: string
 }
 
 // Fields an admin may correct on an existing order
@@ -82,4 +94,14 @@ export interface AuthResponse {
     name: string
     role: string
   }
+}
+
+// GET /settings/admin — shop-wide settings the owner edits on the Settings page
+export interface ShopSettings {
+  whatsappNumber: string // 8801XXXXXXXXX
+  supportPhone: string // 01XXXXXXXXX or ''
+  announcementText: string
+  announcementActive: boolean
+  lowStockThreshold: number
+  updatedAt?: string
 }

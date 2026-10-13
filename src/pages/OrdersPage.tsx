@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   Button,
@@ -29,6 +29,7 @@ import {
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import DownloadIcon from '@mui/icons-material/Download'
 import { ordersApi } from '@/api/orders'
+import { useOrders } from '@/hooks/useOrders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
@@ -38,6 +39,7 @@ import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
+import { hasPreorder } from '@/utils/preorder'
 
 const isStatus = (value: string | null): value is OrderStatus =>
   STATUSES.includes(value as OrderStatus)
@@ -60,10 +62,7 @@ export default function OrdersPage() {
   const setStatusFilter = (status: OrderStatus | 'All') =>
     setSearchParams(status === 'All' ? {} : { status }, { replace: true })
 
-  const { data: orders, isLoading, isError } = useQuery({
-    queryKey: ['orders'],
-    queryFn: ordersApi.getAll,
-  })
+  const { data: orders, isLoading, isError } = useOrders()
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
@@ -243,7 +242,10 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell>{formatPrice(order.total)}</TableCell>
                       <TableCell>
-                        <Chip size="small" label={order.status} color={statusColor[order.status]} />
+                        <Stack direction="row" spacing={0.5}>
+                          <Chip size="small" label={order.status} color={statusColor[order.status]} />
+                          {hasPreorder(order) && <Chip size="small" variant="outlined" color="info" label="Pre-order" />}
+                        </Stack>
                       </TableCell>
                       <TableCell>
                         {nextStatuses.length === 0 ? (
