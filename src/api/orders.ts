@@ -1,6 +1,6 @@
 import apiClient from './client.ts'
 import { fetchAllPagesWithTime } from './paginate.ts'
-import type { DeliveryOptions, ManualOrderInput, Order, OrderDetailsUpdate, OrderList, OrderStatus } from '@/types'
+import type { DeliveryOptions, ManualOrderInput, Order, OrderDetailsUpdate, OrderList, StatusUpdate } from '@/types'
 
 const ORDER_PAGE_SIZE = 100
 
@@ -39,7 +39,7 @@ export const ordersApi = {
   },
 
   // PATCH /orders/:id -> { success, data: order } — contact and delivery details only;
-  // the API refuses items/totals, freezes Delivered/Cancelled orders, allows district
+  // the API refuses items/totals, freezes Delivered/Cancelled/Returned orders, allows district
   // and area only while Pending, and recomputes the fee and total itself
   updateDetails: async (id: string, details: OrderDetailsUpdate): Promise<Order> => {
     const res = await apiClient.patch(`/orders/${id}`, details)
@@ -53,8 +53,8 @@ export const ordersApi = {
   },
 
   // PATCH /orders/:id/status -> { success, data: order }
-  updateStatus: async (id: string, status: OrderStatus): Promise<Order> => {
-    const res = await apiClient.patch(`/orders/${id}/status`, { status })
+  updateStatus: async (id: string, change: StatusUpdate): Promise<Order> => {
+    const res = await apiClient.patch(`/orders/${id}/status`, change)
     return res.data.data
   },
 }

@@ -23,6 +23,12 @@ describe('ordersToCsv', () => {
     expect(row).toContain('"say ""hi"""')
   })
 
+  it('adds the cancel or return reason', () => {
+    const csv = ordersToCsv([makeOrder({ status: 'Returned', cancelReason: 'Customer refused the parcel' })])
+    const row = csv.split('\r\n')[1]
+    expect(row).toContain('"Customer refused the parcel"')
+  })
+
   it('includes the discount and the source', () => {
     const csv = ordersToCsv([makeOrder({ subtotal: 2000, discount: 200, total: 1860, source: 'facebook' })])
     const [header, row] = csv.split('\r\n')

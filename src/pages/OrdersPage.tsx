@@ -6,10 +6,6 @@ import {
   Button,
   Chip,
   CircularProgress,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
   IconButton,
   MenuItem,
   Paper,
@@ -35,8 +31,9 @@ import { useOrders } from '@/hooks/useOrders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
-import type { DeliveryArea, Order, OrderSource, OrderStatus } from '@/types'
+import type { DeliveryArea, Order, OrderSource, OrderStatus, StatusUpdate } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
+import StatusChangeDialog from '@/components/StatusChangeDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { filterOrders } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
@@ -53,7 +50,8 @@ export default function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [cancelTarget, setCancelTarget] = useState<Order | null>(null)
+  // Cancelling or returning asks for a reason first
+  const [pendingChange, setPendingChange] = useState<{ order: Order; status: 'Cancelled' | 'Returned' } | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -69,17 +67,16 @@ export default function OrdersPage() {
   const { data: orders, isLoading, isError } = useOrders()
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, status }: { id: string; status: OrderStatus }) =>
-      ordersApi.updateStatus(id, status),
+    mutationFn: ({ id, change }: { id: string; change: StatusUpdate }) => ordersApi.updateStatus(id, change),
     onSuccess: (order) => {
       setError('')
-      setCancelTarget(null)
+      setPendingChange(null)
       notify(`${order.orderNumber} is now ${order.status}`)
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
     },
     onError: (err) => {
-      setCancelTarget(null)
+      setPendingChange(null)
       setError(getErrorMessage(err, 'Status update failed'))
       // A 409 usually means the order changed elsewhere — show its current state
       queryClient.invalidateQueries({ queryKey: ['orders'] })
@@ -94,11 +91,11 @@ export default function OrdersPage() {
 
   const handleChange = (order: Order, status: OrderStatus) => {
     if (status === order.status) return
-    if (status === 'Cancelled') {
-      setCancelTarget(order)
+    if (status === 'Cancelled' || status === 'Returned') {
+      setPendingChange({ order, status })
       return
     }
-    statusMutation.mutate({ id: order._id, status })
+    statusMutation.mutate({ id: order._id, change: { status } })
   }
 
   const filteredOrders = orders
@@ -348,33 +345,19 @@ export default function OrdersPage() {
       <Typography variant="body2" color="text.secondary">
         Orders move forward only: Pending → Processing → Shipped → Delivered, or Cancelled from
         Pending/Processing. Pending → Processing takes the items out of stock; Processing → Cancelled
-        puts them back.
+        puts them back. A parcel refused at the door is Shipped → Returned, which puts the items back unless
+        you untick it. Delivered is final: the shop takes no returns after delivery.
       </Typography>
 
-      {/* Cancel confirmation — cancelling is final and can change stock */}
-      <Dialog open={cancelTarget !== null} onClose={() => !statusMutation.isPending && setCancelTarget(null)}>
-        <DialogTitle>Cancel order {cancelTarget?.orderNumber}?</DialogTitle>
-        <DialogContent>
-          <Typography>
-            {cancelTarget?.customerName}'s order will be cancelled. This can't be undone.
-            {cancelTarget?.status === 'Processing' && ' Its items will be returned to stock.'}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setCancelTarget(null)} disabled={statusMutation.isPending}>
-            Keep order
-          </Button>
-          <Button
-            color="error"
-            variant="contained"
-            disabled={statusMutation.isPending}
-            startIcon={statusMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
-            onClick={() => cancelTarget && statusMutation.mutate({ id: cancelTarget._id, status: 'Cancelled' })}
-          >
-            Cancel order
-          </Button>
-        </DialogActions>
-      </Dialog>
+      {/* Cancel or mark returned: asks for the reason and restock */}
+      <StatusChangeDialog
+        key={pendingChange ? `${pendingChange.order._id}-${pendingChange.status}` : 'closed'}
+        order={pendingChange?.order ?? null}
+        status={pendingChange?.status ?? 'Cancelled'}
+        saving={statusMutation.isPending}
+        onClose={() => setPendingChange(null)}
+        onConfirm={(change) => pendingChange && statusMutation.mutate({ id: pendingChange.order._id, change })}
+      />
 
       {/* Order Detail Modal */}
       <OrderDetailModal

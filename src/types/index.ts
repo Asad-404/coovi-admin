@@ -1,6 +1,6 @@
 // Types matching the REAL coovi-api responses (see API_ENDPOINTS.md)
 
-export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled'
+export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Returned'
 
 // Only Dhaka city is inside Dhaka; Dhaka suburbs and every other district are outside
 export type DeliveryArea = 'inside_dhaka' | 'outside_dhaka'
@@ -92,6 +92,11 @@ export interface Order {
   paymentMethod: string
   status: OrderStatus
   notes?: string
+  // Why it was cancelled or the parcel came back
+  cancelReason?: string
+  returnedAt?: string
+  // Whether the refused parcel's items went back into stock
+  restocked?: boolean
   // Missing on orders from an API before manual order entry: treat as 'website'
   source?: OrderSource
   // Email of the admin who entered a manual order
@@ -101,6 +106,14 @@ export interface Order {
   editHistory?: DetailEdit[]
   createdAt: string
   updatedAt: string
+}
+
+// Body of PATCH /orders/:id/status. reason is required for Returned;
+// restock only applies to Returned
+export interface StatusUpdate {
+  status: OrderStatus
+  reason?: string
+  restock?: boolean
 }
 
 // POST /orders/manual body: items and quantities only, the API prices them
