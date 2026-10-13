@@ -158,6 +158,68 @@ export interface AuthResponse {
   }
 }
 
+// Cash on delivery payouts from the courier (see API_ENDPOINTS.md, /courier-payments)
+export const PAYMENT_METHODS = ['Bank transfer', 'bKash', 'Nagad', 'Cash', 'Other'] as const
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number]
+
+export interface CourierPaymentLine {
+  order: string
+  orderNumber: string
+  orderTotal: number
+  collected: number
+  charge: number
+  net: number
+}
+
+export interface CourierPayment {
+  _id: string
+  courier: string
+  paidAt: string
+  method?: PaymentMethod
+  reference?: string
+  lines: CourierPaymentLine[]
+  collectedTotal: number
+  chargeTotal: number
+  netTotal: number
+  amountReceived: number
+  difference: number
+  notes?: string
+  recordedBy?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CourierPaymentSummary {
+  collectedTotal: number
+  chargeTotal: number
+  netTotal: number
+  amountReceived: number
+}
+
+export interface CourierPaymentList {
+  payments: CourierPayment[]
+  summary: CourierPaymentSummary
+  total: number
+}
+
+export type UnpaidOrder = Pick<Order, '_id' | 'orderNumber' | 'customerName' | 'phone' | 'total' | 'status' | 'createdAt' | 'updatedAt'>
+
+export interface UnpaidOrders {
+  orders: UnpaidOrder[]
+  count: number
+  expectedTotal: number
+}
+
+export interface NewCourierPayment {
+  courier?: string
+  paidAt: string
+  method?: PaymentMethod
+  reference?: string
+  amountReceived?: number
+  notes?: string
+  lines: { orderNumber: string; collected: number; charge: number }[]
+}
+
 // GET /settings/admin — shop-wide settings the owner edits on the Settings page
 export interface ShopSettings {
   whatsappNumber: string // 8801XXXXXXXXX
