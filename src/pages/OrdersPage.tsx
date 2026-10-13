@@ -27,6 +27,7 @@ import {
   Typography,
 } from '@mui/material'
 import VisibilityIcon from '@mui/icons-material/Visibility'
+import StickyNote2Icon from '@mui/icons-material/StickyNote2'
 import DownloadIcon from '@mui/icons-material/Download'
 import { ordersApi } from '@/api/orders'
 import { getErrorMessage } from '@/api/errors'
@@ -210,7 +211,16 @@ export default function OrdersPage() {
                   const saving = savingId === order._id
                   return (
                     <TableRow key={order._id} hover>
-                      <TableCell>{order.orderNumber}</TableCell>
+                      <TableCell>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                          <span>{order.orderNumber}</span>
+                          {Boolean(order.internalNotes?.length) && (
+                            <Tooltip title={`${order.internalNotes!.length} private note${order.internalNotes!.length === 1 ? '' : 's'}`}>
+                              <StickyNote2Icon fontSize="small" color="action" aria-label="Has private notes" />
+                            </Tooltip>
+                          )}
+                        </Stack>
+                      </TableCell>
                       <TableCell>{formatDate(order.createdAt)}</TableCell>
                       <TableCell>
                         <Tooltip title={order.address}>

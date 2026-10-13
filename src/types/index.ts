@@ -35,6 +35,30 @@ export interface OrderItem {
   preorderDays?: number
 }
 
+// Admin-only order records (the API never sends these to customers).
+// "by" is the admin's email, or 'customer' for the order being placed.
+export interface OrderNote {
+  _id: string
+  text: string
+  by: string
+  at: string
+}
+
+export interface StatusChange {
+  _id: string
+  from?: OrderStatus
+  to: OrderStatus
+  by: string
+  at: string
+}
+
+export interface DetailEdit {
+  _id: string
+  changes: { field: string; from?: string; to?: string }[]
+  by: string
+  at: string
+}
+
 // NOTE: address is a plain string in the real API (not an object)
 export interface Order {
   _id: string
@@ -49,6 +73,9 @@ export interface Order {
   paymentMethod: string
   status: OrderStatus
   notes?: string
+  internalNotes?: OrderNote[]
+  statusHistory?: StatusChange[]
+  editHistory?: DetailEdit[]
   createdAt: string
   updatedAt: string
 }

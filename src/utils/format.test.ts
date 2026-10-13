@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { formatPrice, slugify } from './format'
+import { formatDateTime, formatPrice, slugify } from './format'
 
 describe('formatPrice', () => {
   it('adds the taka sign and thousands separators', () => {
     expect(formatPrice(12500)).toBe('৳12,500')
+  })
+})
+
+describe('formatDateTime', () => {
+  it('shows the date and the time of day', () => {
+    const text = formatDateTime('2026-10-13T08:05:00.000Z')
+    expect(text).toContain('Oct 2026')
+    expect(text).toMatch(/\d{2}:05/)
   })
 })
 
