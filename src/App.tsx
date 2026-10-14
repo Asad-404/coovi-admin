@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import ErrorBoundary from '@/components/ErrorBoundary.tsx'
 import DashboardLayout from '@/components/layout/DashboardLayout.tsx'
@@ -10,6 +10,9 @@ import ProductFormPage from '@/pages/ProductFormPage.tsx'
 import ProductsPage from '@/pages/ProductsPage.tsx'
 import SettingsPage from '@/pages/SettingsPage.tsx'
 import { hasUsableToken } from '@/utils/auth'
+
+// Loaded on first visit so the main bundle stays small
+const CourierPaymentsPage = lazy(() => import('@/pages/CourierPaymentsPage.tsx'))
 
 // Client-side guard: hides the dashboard pages when no unexpired token is stored.
 // Real security is on the API — every request still needs a valid JWT.
@@ -39,6 +42,7 @@ export default function App() {
           <Route path="/products/new" element={<ProductFormPage />} />
           <Route path="/products/:slug/edit" element={<ProductFormPage />} />
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/courier-payments" element={<Suspense fallback={null}><CourierPaymentsPage /></Suspense>} />
           <Route path="/orders/new" element={<OrderFormPage />} />
           <Route path="/settings" element={<SettingsPage />} />
         </Route>
