@@ -1,45 +1,37 @@
 import { describe, expect, it } from 'vitest'
-import { filterOrders } from './orderFilters'
+import { toOrderQuery } from './orderFilters'
 import type { OrderFilters } from './orderFilters'
-import { makeOrder } from '@/test/fixtures'
 
-const none: OrderFilters = { search: '', status: 'All', area: 'All', from: '', to: '' }
+const none: OrderFilters = { search: '', status: 'All', area: 'All', from: '', to: '', source: 'All' }
 
-const orders = [
-  makeOrder({ _id: 'a', orderNumber: 'ORD-1', customerName: 'Rahima', phone: '01711111111', status: 'Pending', createdAt: '2026-10-01T06:00:00' }),
-  makeOrder({ _id: 'b', orderNumber: 'ORD-2', customerName: 'Karim', phone: '01822222222', status: 'Delivered', createdAt: '2026-10-03T06:00:00', district: 'Khulna', deliveryArea: 'outside_dhaka' }),
-  makeOrder({ _id: 'c', orderNumber: 'ORD-3', customerName: 'Nasrin', phone: '01933333333', status: 'Pending', createdAt: '2026-10-05T23:30:00', source: 'facebook' }),
-]
-const ids = (list: { _id: string }[]) => list.map((o) => o._id)
-
-describe('filterOrders', () => {
-  it('returns everything with no filters', () => {
-    expect(ids(filterOrders(orders, none))).toEqual(['a', 'b', 'c'])
+describe('toOrderQuery', () => {
+  it('sends nothing with no filters', () => {
+    expect(toOrderQuery(none)).toEqual({})
+    expect(toOrderQuery({ search: '  ', status: 'All', from: '', to: '' })).toEqual({})
   })
 
-  it('searches order number, name (any case) and phone', () => {
-    expect(ids(filterOrders(orders, { ...none, search: 'ord-2' }))).toEqual(['b'])
-    expect(ids(filterOrders(orders, { ...none, search: 'NASRIN' }))).toEqual(['c'])
-    expect(ids(filterOrders(orders, { ...none, search: '0171' }))).toEqual(['a'])
+  it('sends each filter that is set, with the search trimmed', () => {
+    expect(
+      toOrderQuery({
+        search: ' 0171 ',
+        status: 'Pending',
+        area: 'outside_dhaka',
+        source: 'facebook',
+        from: '2026-10-01',
+        to: '2026-10-15',
+      }),
+    ).toEqual({
+      search: '0171',
+      status: 'Pending',
+      deliveryArea: 'outside_dhaka',
+      source: 'facebook',
+      from: '2026-10-01',
+      to: '2026-10-15',
+    })
   })
 
-  it('filters by status', () => {
-    expect(ids(filterOrders(orders, { ...none, status: 'Pending' }))).toEqual(['a', 'c'])
-  })
-
-  it('filters by delivery area, counting old orders as inside Dhaka', () => {
-    expect(ids(filterOrders(orders, { ...none, area: 'outside_dhaka' }))).toEqual(['b'])
-    expect(ids(filterOrders(orders, { ...none, area: 'inside_dhaka' }))).toEqual(['a', 'c'])
-  })
-
-  it('includes whole days at both ends of the date range', () => {
-    expect(ids(filterOrders(orders, { ...none, from: '2026-10-03', to: '2026-10-05' }))).toEqual(['b', 'c'])
-    expect(ids(filterOrders(orders, { ...none, to: '2026-10-01' }))).toEqual(['a'])
-  })
-
-  it('filters by source, counting orders without one as website orders', () => {
-    expect(ids(filterOrders(orders, { ...none, source: 'facebook' }))).toEqual(['c'])
-    expect(ids(filterOrders(orders, { ...none, source: 'website' }))).toEqual(['a', 'b'])
-    expect(ids(filterOrders(orders, { ...none, source: 'All' }))).toEqual(['a', 'b', 'c'])
+  it('allows an open-ended date range', () => {
+    expect(toOrderQuery({ ...none, from: '2026-10-01' })).toEqual({ from: '2026-10-01' })
+    expect(toOrderQuery({ ...none, to: '2026-10-15' })).toEqual({ to: '2026-10-15' })
   })
 })

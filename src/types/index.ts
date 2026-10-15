@@ -132,10 +132,11 @@ export interface ManualOrderInput {
   discount?: number
 }
 
-// The admin's cached order list and the server clock it was fetched at (see utils/orderSync.ts)
-export interface OrderList {
+// One page of the admin order list (GET /orders with filters)
+export interface OrderPage {
   orders: Order[]
-  serverTime?: string
+  // How many orders match the filters across every page
+  total: number
 }
 
 // Fields an admin may correct on an existing order

@@ -17,6 +17,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Tooltip,
@@ -27,7 +28,8 @@ import StickyNote2Icon from '@mui/icons-material/StickyNote2'
 import DownloadIcon from '@mui/icons-material/Download'
 import AddIcon from '@mui/icons-material/Add'
 import { ordersApi } from '@/api/orders'
-import { useOrders } from '@/hooks/useOrders'
+import { useOrderPage } from '@/hooks/useOrders'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
@@ -36,7 +38,7 @@ import OrderDetailModal from '@/components/OrderDetailModal'
 import StatusChangeDialog from '@/components/StatusChangeDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { useAccess } from '@/hooks/useMe'
-import { filterOrders } from '@/utils/orderFilters'
+import { toOrderQuery } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
@@ -45,13 +47,17 @@ import { ORDER_SOURCES, SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 const isStatus = (value: string | null): value is OrderStatus =>
   STATUSES.includes(value as OrderStatus)
 
+const PAGE_SIZES = [25, 50, 100]
+
 export default function OrdersPage() {
   const queryClient = useQueryClient()
   const notify = useNotify()
   const { can } = useAccess()
   const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState('')
-  const [selectedId, setSelectedId] = useState<string | null>(null)
+  // The order whose details are open; refreshed from the page below while it is on it
+  const [selected, setSelected] = useState<Order | null>(null)
+  const [exporting, setExporting] = useState(false)
   // Cancelling or returning asks for a reason first
   const [pendingChange, setPendingChange] = useState<{ order: Order; status: 'Cancelled' | 'Returned' } | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
@@ -66,7 +72,26 @@ export default function OrdersPage() {
   const setStatusFilter = (status: OrderStatus | 'All') =>
     setSearchParams(status === 'All' ? {} : { status }, { replace: true })
 
-  const { data: orders, isLoading, isError } = useOrders()
+  // The API searches and filters; the search waits until typing stops
+  const search = useDebouncedValue(searchTerm)
+  const query = toOrderQuery({
+    search,
+    status: statusFilter,
+    area: areaFilter,
+    from: fromDate,
+    to: toDate,
+    source: sourceFilter,
+  })
+
+  // Changing any filter goes back to the first page
+  const queryKey = JSON.stringify(query)
+  const [paging, setPaging] = useState({ queryKey, page: 0 })
+  const page = paging.queryKey === queryKey ? paging.page : 0
+  const [pageSize, setPageSize] = useState(PAGE_SIZES[0])
+
+  const { data, isLoading, isError, isFetching } = useOrderPage(query, page + 1, pageSize)
+  const orders = data?.orders
+  const total = data?.total ?? 0
 
   const statusMutation = useMutation({
     mutationFn: ({ id, change }: { id: string; change: StatusUpdate }) => ordersApi.updateStatus(id, change),
@@ -85,8 +110,8 @@ export default function OrdersPage() {
     },
   })
 
-  // Looked up from the list so the details window shows fresh data after an edit
-  const selectedOrder = orders?.find((o) => o._id === selectedId) ?? null
+  // Looked up from the page so the details window shows fresh data after an edit
+  const selectedOrder = (selected && orders?.find((o) => o._id === selected._id)) ?? selected
 
   // Only the row being saved is locked, the rest of the table stays usable
   const savingId = statusMutation.isPending ? statusMutation.variables?.id : undefined
@@ -100,16 +125,18 @@ export default function OrdersPage() {
     statusMutation.mutate({ id: order._id, change: { status } })
   }
 
-  const filteredOrders = orders
-    ? filterOrders(orders, {
-        search: searchTerm,
-        status: statusFilter,
-        area: areaFilter,
-        from: fromDate,
-        to: toDate,
-        source: sourceFilter,
-      })
-    : undefined
+  // The file has every order matching the filters, not just this page
+  const exportCsv = async () => {
+    setExporting(true)
+    try {
+      const all = await ordersApi.getAllMatching(query)
+      downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(all))
+    } catch (err) {
+      setError(getErrorMessage(err, 'Could not export the orders'))
+    } finally {
+      setExporting(false)
+    }
+  }
 
   const hasFilters = Boolean(
     searchTerm || fromDate || toDate || statusFilter !== 'All' || areaFilter !== 'All' || sourceFilter !== 'All',
@@ -129,13 +156,11 @@ export default function OrdersPage() {
           {can('orders.export') && (
             <Button
               variant="outlined"
-              startIcon={<DownloadIcon />}
-              disabled={!filteredOrders?.length}
-              onClick={() =>
-                downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
-              }
+              startIcon={exporting ? <CircularProgress size={18} /> : <DownloadIcon />}
+              disabled={total === 0 || exporting}
+              onClick={exportCsv}
             >
-              Export CSV
+              {exporting ? 'Exporting…' : 'Export CSV'}
             </Button>
           )}
         </Stack>
@@ -237,9 +262,14 @@ export default function OrdersPage() {
         </Alert>
       ) : (
         <>
-          <Typography variant="body2" color="text.secondary">
-            Showing {filteredOrders?.length ?? 0} of {orders?.length ?? 0} orders
-          </Typography>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <Typography variant="body2" color="text.secondary">
+              {total === 0
+                ? 'No orders'
+                : `Showing ${page * pageSize + 1} to ${Math.min((page + 1) * pageSize, total)} of ${total} order${total === 1 ? '' : 's'}${hasFilters ? ' matching your filters' : ''}`}
+            </Typography>
+            {isFetching && <CircularProgress size={14} aria-label="Loading" />}
+          </Stack>
 
           <TableContainer component={Paper}>
             <Table sx={{ minWidth: 1000 }}>
@@ -257,7 +287,7 @@ export default function OrdersPage() {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredOrders?.map((order) => {
+                {orders?.map((order) => {
                   const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0)
                   const nextStatuses = NEXT_STATUSES[order.status]
                   const saving = savingId === order._id
@@ -324,7 +354,7 @@ export default function OrdersPage() {
                       </TableCell>
                       <TableCell>
                         <Tooltip title="View Details">
-                          <IconButton onClick={() => setSelectedId(order._id)} size="small" aria-label={`View ${order.orderNumber}`}>
+                          <IconButton onClick={() => setSelected(order)} size="small" aria-label={`View ${order.orderNumber}`}>
                             <VisibilityIcon />
                           </IconButton>
                         </Tooltip>
@@ -332,7 +362,7 @@ export default function OrdersPage() {
                     </TableRow>
                   )
                 })}
-                {filteredOrders?.length === 0 && (
+                {orders?.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={9}>
                       <Typography align="center" color="text.secondary" sx={{ py: 3 }}>
@@ -345,6 +375,18 @@ export default function OrdersPage() {
                 )}
               </TableBody>
             </Table>
+            <TablePagination
+              component="div"
+              count={total}
+              page={page}
+              rowsPerPage={pageSize}
+              rowsPerPageOptions={PAGE_SIZES}
+              onPageChange={(_, next) => setPaging({ queryKey, page: next })}
+              onRowsPerPageChange={(e) => {
+                setPageSize(Number(e.target.value))
+                setPaging({ queryKey, page: 0 })
+              }}
+            />
           </TableContainer>
         </>
       )}
@@ -370,7 +412,7 @@ export default function OrdersPage() {
       <OrderDetailModal
         order={selectedOrder}
         open={Boolean(selectedOrder)}
-        onClose={() => setSelectedId(null)}
+        onClose={() => setSelected(null)}
       />
     </Stack>
   )
