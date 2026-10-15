@@ -14,6 +14,12 @@ export const productsApi = {
     return res.data.data
   },
 
+  // GET /products/:id/cost -> { success, data: { costPrice } } (needs money access)
+  getCost: async (id: string): Promise<number | null> => {
+    const res = await apiClient.get(`/products/${id}/cost`)
+    return res.data.data.costPrice
+  },
+
   create: async (data: Partial<Product>): Promise<Product> => {
     const res = await apiClient.post('/products', data)
     return res.data.data

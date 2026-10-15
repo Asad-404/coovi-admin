@@ -1,25 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { countByStatus, dailyRevenue, lowStockProducts, revenueOf } from './dashboardStats'
-import { makeOrder, makeProduct } from '@/test/fixtures'
-
-describe('revenueOf', () => {
-  it('leaves out cancelled orders', () => {
-    const orders = [
-      makeOrder({ total: 1000, status: 'Delivered' }),
-      makeOrder({ total: 500, status: 'Pending' }),
-      makeOrder({ total: 9999, status: 'Cancelled' }),
-      makeOrder({ total: 8888, status: 'Returned' }),
-    ]
-    expect(revenueOf(orders)).toBe(1500)
-  })
-})
-
-describe('countByStatus', () => {
-  it('counts every status, including zero', () => {
-    const counts = countByStatus([makeOrder({ status: 'Pending' }), makeOrder({ status: 'Pending' }), makeOrder({ status: 'Shipped' })])
-    expect(counts).toEqual({ Pending: 2, Processing: 0, Shipped: 1, Delivered: 0, Cancelled: 0, Returned: 0 })
-  })
-})
+import { dhakaToday, lowStockProducts, percent, rangeFor, rangeProblem } from './dashboardStats'
+import { makeProduct } from '@/test/fixtures'
 
 describe('lowStockProducts', () => {
   it('keeps products under the threshold, lowest first', () => {
@@ -38,24 +19,44 @@ describe('lowStockProducts', () => {
   })
 })
 
-describe('dailyRevenue', () => {
-  it('buckets the last N local days, oldest first, without cancelled orders', () => {
-    const now = new Date(2026, 9, 6, 15)
-    const days = dailyRevenue(
-      [
-        makeOrder({ total: 100, createdAt: new Date(2026, 9, 6, 9).toISOString() }),
-        makeOrder({ total: 50, createdAt: new Date(2026, 9, 6, 11).toISOString() }),
-        makeOrder({ total: 70, createdAt: new Date(2026, 9, 4, 9).toISOString() }),
-        makeOrder({ total: 999, status: 'Cancelled', createdAt: new Date(2026, 9, 6, 9).toISOString() }),
-        makeOrder({ total: 999, createdAt: new Date(2026, 8, 1).toISOString() }),
-      ],
-      3,
-      now,
-    )
-    expect(days).toEqual([
-      { date: '2026-10-04', revenue: 70, orders: 1 },
-      { date: '2026-10-05', revenue: 0, orders: 0 },
-      { date: '2026-10-06', revenue: 150, orders: 2 },
-    ])
+describe('dhakaToday', () => {
+  it('is already tomorrow in Bangladesh late in the UTC evening', () => {
+    expect(dhakaToday(new Date('2026-10-15T17:59:00Z'))).toBe('2026-10-15')
+    expect(dhakaToday(new Date('2026-10-15T18:00:00Z'))).toBe('2026-10-16')
+  })
+})
+
+describe('rangeFor', () => {
+  const now = new Date('2026-10-15T06:00:00Z')
+
+  it('counts today in every preset', () => {
+    expect(rangeFor('today', now)).toEqual({ from: '2026-10-15', to: '2026-10-15' })
+    expect(rangeFor('7d', now)).toEqual({ from: '2026-10-09', to: '2026-10-15' })
+    expect(rangeFor('30d', now)).toEqual({ from: '2026-09-16', to: '2026-10-15' })
+    expect(rangeFor('month', now)).toEqual({ from: '2026-10-01', to: '2026-10-15' })
+  })
+
+  it('crosses a year end', () => {
+    expect(rangeFor('7d', new Date('2027-01-02T06:00:00Z'))).toEqual({ from: '2026-12-27', to: '2027-01-02' })
+  })
+})
+
+describe('rangeProblem', () => {
+  it('accepts a normal range', () => {
+    expect(rangeProblem({ from: '2026-10-01', to: '2026-10-15' })).toBeNull()
+    expect(rangeProblem({ from: '2026-01-01', to: '2026-12-31' })).toBeNull()
+  })
+
+  it('explains what is wrong', () => {
+    expect(rangeProblem({ from: '', to: '2026-10-15' })).toBe('Pick both dates')
+    expect(rangeProblem({ from: '2026-10-16', to: '2026-10-15' })).toMatch(/on or before/)
+    expect(rangeProblem({ from: '2025-01-01', to: '2026-10-15' })).toMatch(/at most 366/)
+  })
+})
+
+describe('percent', () => {
+  it('rounds and handles nothing to divide by', () => {
+    expect(percent(1, 3)).toBe('33%')
+    expect(percent(0, 0)).toBe('–')
   })
 })

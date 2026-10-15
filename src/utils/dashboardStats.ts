@@ -1,46 +1,56 @@
 import { LOW_STOCK_THRESHOLD } from '@/constants'
-import type { Order, OrderStatus, Product } from '@/types'
-import { STATUSES } from '@/utils/orderStatus'
-
-// Cancelled and returned orders don't bring in money, so they don't count as revenue
-const earnsMoney = (order: Order): boolean => order.status !== 'Cancelled' && order.status !== 'Returned'
-
-export const revenueOf = (orders: Order[]): number =>
-  orders.filter(earnsMoney).reduce((sum, o) => sum + o.total, 0)
-
-export const countByStatus = (orders: Order[]): Record<OrderStatus, number> => {
-  const counts = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<OrderStatus, number>
-  for (const order of orders) counts[order.status] += 1
-  return counts
-}
+import type { Product } from '@/types'
 
 export const lowStockProducts = (products: Product[], threshold = LOW_STOCK_THRESHOLD): Product[] =>
   products.filter((p) => p.stock < threshold).sort((a, b) => a.stock - b.stock)
 
-export interface DailyRevenue {
-  date: string // yyyy-mm-dd, local time
-  revenue: number
-  orders: number
+export const RANGE_PRESETS = [
+  { key: 'today', label: 'Today' },
+  { key: '7d', label: '7 days' },
+  { key: '30d', label: '30 days' },
+  { key: 'month', label: 'This month' },
+  { key: 'custom', label: 'Custom' },
+] as const
+export type RangePreset = (typeof RANGE_PRESETS)[number]['key']
+
+export interface DateRange {
+  from: string // yyyy-mm-dd, a Bangladesh day
+  to: string
 }
 
-const localDateKey = (d: Date): string =>
-  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+const DAY_MS = 24 * 60 * 60 * 1000
+const DHAKA_OFFSET_MS = 6 * 60 * 60 * 1000
 
-// Revenue per day for the last `days` days (oldest first), cancelled and returned excluded
-export const dailyRevenue = (orders: Order[], days: number, now = new Date()): DailyRevenue[] => {
-  const buckets = new Map<string, DailyRevenue>()
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)
-    const key = localDateKey(d)
-    buckets.set(key, { date: key, revenue: 0, orders: 0 })
+// The shop's day in Bangladesh (UTC+6), whatever time zone this computer is in
+export const dhakaToday = (now = new Date()): string => new Date(now.getTime() + DHAKA_OFFSET_MS).toISOString().slice(0, 10)
+
+const addDays = (day: string, days: number): string =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + days * DAY_MS).toISOString().slice(0, 10)
+
+// The from/to days for a preset; custom keeps whatever was picked
+export const rangeFor = (preset: Exclude<RangePreset, 'custom'>, now = new Date()): DateRange => {
+  const today = dhakaToday(now)
+  switch (preset) {
+    case 'today':
+      return { from: today, to: today }
+    case '7d':
+      return { from: addDays(today, -6), to: today }
+    case '30d':
+      return { from: addDays(today, -29), to: today }
+    case 'month':
+      return { from: `${today.slice(0, 8)}01`, to: today }
   }
-  for (const order of orders) {
-    if (!earnsMoney(order)) continue
-    const bucket = buckets.get(localDateKey(new Date(order.createdAt)))
-    if (bucket) {
-      bucket.revenue += order.total
-      bucket.orders += 1
-    }
-  }
-  return [...buckets.values()]
 }
+
+// The API accepts at most 366 days, from on or before to
+export const MAX_RANGE_DAYS = 366
+export const rangeProblem = ({ from, to }: DateRange): string | null => {
+  if (!from || !to) return 'Pick both dates'
+  if (from > to) return 'The start date must be on or before the end date'
+  const days = (Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS + 1
+  if (days > MAX_RANGE_DAYS) return `Pick at most ${MAX_RANGE_DAYS} days`
+  return null
+}
+
+export const percent = (part: number, whole: number): string =>
+  whole > 0 ? `${Math.round((part / whole) * 100)}%` : '–'
