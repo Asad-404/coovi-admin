@@ -7,9 +7,8 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
 import EditNoteIcon from '@mui/icons-material/EditNote'
 import { ordersApi } from '@/api/orders'
 import { getErrorMessage } from '@/api/errors'
-import type { Order, OrderList } from '@/types'
+import type { Order } from '@/types'
 import { ORDERS_KEY } from '@/hooks/useOrders'
-import { mergeOrders } from '@/utils/orderSync'
 import { actorLabel, buildTimeline } from '@/utils/orderTimeline'
 import type { TimelineEntry } from '@/utils/orderTimeline'
 import { formatDateTime } from '@/utils/format'
@@ -31,11 +30,8 @@ export default function OrderTimeline({ order, canAddNotes = true }: { order: Or
 
   const mutation = useMutation({
     mutationFn: (note: string) => ordersApi.addNote(order._id, note),
-    onSuccess: (updated) => {
-      // Show the note at once, then refetch so the list stays in step with the API
-      queryClient.setQueryData<OrderList>(ORDERS_KEY, (latest) =>
-        latest && { ...latest, orders: mergeOrders(latest.orders, [updated]) },
-      )
+    onSuccess: () => {
+      // Refetch the order list so the note shows on this order
       queryClient.invalidateQueries({ queryKey: ORDERS_KEY })
       setText('')
     },

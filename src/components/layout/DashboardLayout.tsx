@@ -32,8 +32,7 @@ import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 import { clearToken } from '@/utils/auth'
 import { ME_KEY, useAccess } from '@/hooks/useMe'
 import type { Permission } from '@/utils/permissions'
-import { useOrders, useOrderSync } from '@/hooks/useOrders'
-import { countPending } from '@/utils/orderSync'
+import { usePendingCount } from '@/hooks/useOrders'
 import { pendingTitle } from '@/utils/pendingOrders'
 
 const drawerWidth = 240
@@ -65,11 +64,9 @@ export default function DashboardLayout() {
     queryClient.invalidateQueries({ queryKey: ME_KEY })
   }, [location.pathname, queryClient])
 
-  // Orders changed anywhere (new orders, cancels, edits on another device) are merged in
-  // every minute without a page reload; the badge and tab title count the Pending ones
-  useOrderSync(canSeeOrders)
-  const { data: orders } = useOrders(canSeeOrders)
-  const pendingCount = orders ? countPending(orders) : 0
+  // The badge and tab title count Pending orders, checked with the API every minute
+  // so a new order shows up without a page reload
+  const { data: pendingCount = 0 } = usePendingCount(canSeeOrders)
 
   useEffect(() => {
     document.title = pendingTitle(pendingCount)
