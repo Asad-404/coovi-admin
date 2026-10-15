@@ -37,12 +37,14 @@ import { formatDate, formatPrice } from '@/utils/format'
 import type { DeliveryArea, Order, OrderSource, OrderStatus, StatusUpdate } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
 import StatusChangeDialog from '@/components/StatusChangeDialog'
+import CallWarningDialog from '@/components/CallWarningDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { useAccess } from '@/hooks/useMe'
 import { toOrderQuery } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
+import { awaitingCall, needsCallWarning } from '@/utils/callConfirm'
 import { blockLabel } from '@/utils/customers'
 import { ORDER_SOURCES, SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 
@@ -62,6 +64,8 @@ export default function OrdersPage() {
   const [exporting, setExporting] = useState(false)
   // Cancelling or returning asks for a reason first
   const [pendingChange, setPendingChange] = useState<{ order: Order; status: 'Cancelled' | 'Returned' } | null>(null)
+  // Moving an order nobody confirmed by call to Processing asks first
+  const [uncalledOrder, setUncalledOrder] = useState<Order | null>(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -96,16 +100,22 @@ export default function OrdersPage() {
   const total = data?.total ?? 0
 
   const statusMutation = useMutation({
-    mutationFn: ({ id, change }: { id: string; change: StatusUpdate }) => ordersApi.updateStatus(id, change),
+    // markCalled: record the call confirmation first, so a failed status change still keeps it
+    mutationFn: async ({ id, change, markCalled }: { id: string; change: StatusUpdate; markCalled?: boolean }) => {
+      if (markCalled) await ordersApi.setCallConfirmed(id, true)
+      return ordersApi.updateStatus(id, change)
+    },
     onSuccess: (order) => {
       setError('')
       setPendingChange(null)
+      setUncalledOrder(null)
       notify(`${order.orderNumber} is now ${order.status}`)
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
     },
     onError: (err) => {
       setPendingChange(null)
+      setUncalledOrder(null)
       setError(getErrorMessage(err, 'Status update failed'))
       // A 409 usually means the order changed elsewhere — show its current state
       queryClient.invalidateQueries({ queryKey: ['orders'] })
@@ -122,6 +132,10 @@ export default function OrdersPage() {
     if (status === order.status) return
     if (status === 'Cancelled' || status === 'Returned') {
       setPendingChange({ order, status })
+      return
+    }
+    if (needsCallWarning(order, status)) {
+      setUncalledOrder(order)
       return
     }
     statusMutation.mutate({ id: order._id, change: { status } })
@@ -330,6 +344,11 @@ export default function OrdersPage() {
                         <Stack direction="row" spacing={0.5}>
                           <Chip size="small" label={order.status} color={statusColor[order.status]} />
                           {hasPreorder(order) && <Chip size="small" variant="outlined" color="info" label="Pre-order" />}
+                          {awaitingCall(order) && (
+                            <Tooltip title="Not confirmed by call yet">
+                              <Chip size="small" variant="outlined" color="warning" label="Not called" />
+                            </Tooltip>
+                          )}
                           {order.blockedPhone && (
                             <Tooltip title={`${blockLabel(order.blockedPhone.note)}. Call before shipping.`}>
                               <Chip size="small" color="error" label="Blocked number" />
@@ -411,6 +430,16 @@ export default function OrdersPage() {
       </Typography>
 
       {/* Cancel or mark returned: asks for the reason and restock */}
+      <CallWarningDialog
+        order={uncalledOrder}
+        saving={statusMutation.isPending}
+        onClose={() => setUncalledOrder(null)}
+        onConfirm={(called) =>
+          uncalledOrder &&
+          statusMutation.mutate({ id: uncalledOrder._id, change: { status: 'Processing' }, markCalled: called })
+        }
+      />
+
       <StatusChangeDialog
         key={pendingChange ? `${pendingChange.order._id}-${pendingChange.status}` : 'closed'}
         order={pendingChange?.order ?? null}
