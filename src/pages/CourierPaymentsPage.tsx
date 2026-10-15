@@ -34,6 +34,7 @@ import RecordPaymentDialog from '@/components/RecordPaymentDialog'
 import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
 import type { CourierPayment } from '@/types'
+import { useAccess } from '@/hooks/useMe'
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
@@ -48,6 +49,8 @@ function StatCard({ label, value, hint }: { label: string; value: string; hint?:
 export default function CourierPaymentsPage() {
   const queryClient = useQueryClient()
   const notify = useNotify()
+  // Recording or deleting a payment needs payments.edit; payments.view only reads
+  const canEdit = useAccess().can('payments.edit')
   const [selected, setSelected] = useState<string[]>([])
   const [recording, setRecording] = useState(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
@@ -84,9 +87,11 @@ export default function CourierPaymentsPage() {
     <Stack spacing={3}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4">Courier payments</Typography>
-        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setRecording(true)}>
-          Record payment{selectedOrders.length ? ` (${selectedOrders.length})` : ''}
-        </Button>
+        {canEdit && (
+          <Button variant="contained" startIcon={<AddIcon />} onClick={() => setRecording(true)}>
+            Record payment{selectedOrders.length ? ` (${selectedOrders.length})` : ''}
+          </Button>
+        )}
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
@@ -232,11 +237,13 @@ export default function CourierPaymentsPage() {
                           </Stack>
                         </TableCell>
                         <TableCell>
-                          <Tooltip title="Delete a payment entered by mistake">
-                            <IconButton size="small" aria-label="Delete payment" onClick={() => setDeleteTarget(payment)}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
+                          {canEdit && (
+                            <Tooltip title="Delete a payment entered by mistake">
+                              <IconButton size="small" aria-label="Delete payment" onClick={() => setDeleteTarget(payment)}>
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
                         </TableCell>
                       </TableRow>
                       <TableRow>

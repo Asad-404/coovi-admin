@@ -35,6 +35,7 @@ import type { DeliveryArea, Order, OrderSource, OrderStatus, StatusUpdate } from
 import OrderDetailModal from '@/components/OrderDetailModal'
 import StatusChangeDialog from '@/components/StatusChangeDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
+import { useAccess } from '@/hooks/useMe'
 import { filterOrders } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
@@ -47,6 +48,7 @@ const isStatus = (value: string | null): value is OrderStatus =>
 export default function OrdersPage() {
   const queryClient = useQueryClient()
   const notify = useNotify()
+  const { can } = useAccess()
   const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -118,19 +120,24 @@ export default function OrdersPage() {
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4">Orders</Typography>
         <Stack direction="row" spacing={1}>
-          <Button variant="contained" startIcon={<AddIcon />} component={RouterLink} to="/orders/new">
-            Add order
-          </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            disabled={!filteredOrders?.length}
-            onClick={() =>
-              downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
-            }
-          >
-            Export CSV
-          </Button>
+          {can('orders.edit') && (
+            <Button variant="contained" startIcon={<AddIcon />} component={RouterLink} to="/orders/new">
+              Add order
+            </Button>
+          )}
+          {/* Needs orders.export: a file of every customer's name, phone and address */}
+          {can('orders.export') && (
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              disabled={!filteredOrders?.length}
+              onClick={() =>
+                downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
+              }
+            >
+              Export CSV
+            </Button>
+          )}
         </Stack>
       </Stack>
 
@@ -289,9 +296,9 @@ export default function OrdersPage() {
                         </Stack>
                       </TableCell>
                       <TableCell>
-                        {nextStatuses.length === 0 ? (
+                        {nextStatuses.length === 0 || !can('orders.edit') ? (
                           <Typography variant="body2" color="text.secondary">
-                            Final
+                            {nextStatuses.length === 0 ? 'Final' : 'View only'}
                           </Typography>
                         ) : (
                           <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>

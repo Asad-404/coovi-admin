@@ -1,3 +1,5 @@
+import type { Permission, Role } from '@/utils/permissions'
+
 // Types matching the REAL coovi-api responses (see API_ENDPOINTS.md)
 
 export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Returned'
@@ -139,11 +141,20 @@ export type OrderDetailsUpdate = Partial<
   Pick<Order, 'customerName' | 'phone' | 'address' | 'notes' | 'district' | 'deliveryArea'>
 >
 
+// Roles and permissions are in src/utils/permissions.ts. 'admin' is the role
+// accounts had before roles existed; the API turns it into 'owner'.
+export type AdminRole = Role
+
 export interface Admin {
   _id: string
   email: string
   name: string
-  role: string
+  role: AdminRole | 'admin'
+  active?: boolean
+  // What this person can do (every permission for owners)
+  permissions?: Permission[]
+  // Their ticks differ from their role's preset
+  customized?: boolean
   createdAt?: string
   updatedAt?: string
 }
