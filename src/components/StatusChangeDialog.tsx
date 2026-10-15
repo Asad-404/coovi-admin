@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  Alert,
   Button,
   Checkbox,
   CircularProgress,
@@ -65,6 +66,13 @@ export default function StatusChangeDialog({ order, status, saving, onClose, onC
             This can't be undone.
             {!returning && order.status === 'Processing' && ' Its items will be returned to stock.'}
           </Typography>
+
+          {!returning && order.courier?.trackingCode && (
+            <Alert severity="warning">
+              This parcel is booked with Steadfast (tracking code {order.courier.trackingCode}).
+              Cancelling here does not cancel it at Steadfast: cancel it in the Steadfast merchant portal too.
+            </Alert>
+          )}
 
           <TextField
             select
