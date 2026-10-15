@@ -35,6 +35,8 @@ export interface Product {
   // Out of stock pre-orders: allowed when on, shipping in about preorderDays
   allowPreorder?: boolean
   preorderDays?: number
+  // Only sent by the admin with money access; never returned by the product list
+  costPrice?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -239,4 +241,34 @@ export interface ShopSettings {
   announcementActive: boolean
   lowStockThreshold: number
   updatedAt?: string
+}
+
+// GET /stats: orders placed in the range. `money` and the `value` fields are only
+// there for people with money access.
+export interface DashboardStats {
+  range: { from: string; to: string; days: number }
+  orders: {
+    total: number
+    byStatus: Record<OrderStatus, number>
+    bySource: Record<string, number>
+    byArea: { inside_dhaka: number; outside_dhaka: number }
+    withPreorder: number
+    refusedRate: number | null
+  }
+  pipeline: { toConfirm: number; toShip: number; onTheWay: number; preordersWaiting: number }
+  daily: { date: string; orders: number; value?: number }[]
+  bestSellers: { productId: string; name: string; quantity: number; value?: number }[]
+  topDistricts: { district: string; orders: number }[]
+  money?: {
+    deliveredRevenue: number
+    deliveredOrders: number
+    orderValue: number
+    averageOrderValue: number | null
+    deliveryFees: number
+    cost: number
+    grossProfit: number
+    profitOrders: number
+    unknownCostOrders: number
+    courierOwes: { orders: number; total: number }
+  }
 }
