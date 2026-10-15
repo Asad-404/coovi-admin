@@ -18,6 +18,7 @@ import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
 import OrderTimeline from '@/components/OrderTimeline'
+import CustomerSummary from '@/components/CustomerSummary'
 import { useAccess } from '@/hooks/useMe'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
@@ -53,6 +54,9 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
       </DialogTitle>
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1 }}>
+          {/* This phone's order history and block mark */}
+          <CustomerSummary phone={order.phone} />
+
           {/* Status */}
           <div>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>

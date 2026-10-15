@@ -16,6 +16,7 @@ import type { Permission } from '@/utils/permissions'
 // Loaded on first visit so the main bundle stays small
 const CourierPaymentsPage = lazy(() => import('@/pages/CourierPaymentsPage.tsx'))
 const TeamPage = lazy(() => import('@/pages/TeamPage.tsx'))
+const CustomersPage = lazy(() => import('@/pages/CustomersPage.tsx'))
 
 // Client-side guard: hides the dashboard pages when no unexpired token is stored.
 // Real security is on the API — every request still needs a valid JWT.
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="/products/new" element={<Allow permission="products.edit"><ProductFormPage /></Allow>} />
           <Route path="/products/:slug/edit" element={<Allow permission="products.edit"><ProductFormPage /></Allow>} />
           <Route path="/orders" element={<Allow permission="orders.view"><OrdersPage /></Allow>} />
+          <Route path="/customers" element={<Allow permission="orders.view"><Suspense fallback={null}><CustomersPage /></Suspense></Allow>} />
           <Route path="/courier-payments" element={<Allow permission="payments.view"><Suspense fallback={null}><CourierPaymentsPage /></Suspense></Allow>} />
           <Route path="/orders/new" element={<Allow permission="orders.edit"><OrderFormPage /></Allow>} />
           <Route path="/settings" element={<Allow permission="settings.view"><SettingsPage /></Allow>} />
