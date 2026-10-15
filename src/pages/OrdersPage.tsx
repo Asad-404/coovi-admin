@@ -23,6 +23,7 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
+import { alpha } from '@mui/material/styles'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import StickyNote2Icon from '@mui/icons-material/StickyNote2'
 import DownloadIcon from '@mui/icons-material/Download'
@@ -42,6 +43,7 @@ import { toOrderQuery } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
+import { blockLabel } from '@/utils/customers'
 import { ORDER_SOURCES, SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 
 const isStatus = (value: string | null): value is OrderStatus =>
@@ -292,7 +294,12 @@ export default function OrdersPage() {
                   const nextStatuses = NEXT_STATUSES[order.status]
                   const saving = savingId === order._id
                   return (
-                    <TableRow key={order._id} hover>
+                    <TableRow
+                      key={order._id}
+                      hover
+                      // A blocked number: still taken, shown in red so someone calls before shipping
+                      sx={order.blockedPhone ? { bgcolor: (theme) => alpha(theme.palette.error.main, 0.08) } : undefined}
+                    >
                       <TableCell>
                         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                           <span>{order.orderNumber}</span>
@@ -323,6 +330,11 @@ export default function OrdersPage() {
                         <Stack direction="row" spacing={0.5}>
                           <Chip size="small" label={order.status} color={statusColor[order.status]} />
                           {hasPreorder(order) && <Chip size="small" variant="outlined" color="info" label="Pre-order" />}
+                          {order.blockedPhone && (
+                            <Tooltip title={`${blockLabel(order.blockedPhone.note)}. Call before shipping.`}>
+                              <Chip size="small" color="error" label="Blocked number" />
+                            </Tooltip>
+                          )}
                         </Stack>
                       </TableCell>
                       <TableCell>

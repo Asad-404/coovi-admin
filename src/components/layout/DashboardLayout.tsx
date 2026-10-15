@@ -28,6 +28,7 @@ import LockResetIcon from '@mui/icons-material/LockReset'
 import MenuIcon from '@mui/icons-material/Menu'
 import SettingsIcon from '@mui/icons-material/Settings'
 import GroupIcon from '@mui/icons-material/Group'
+import ContactsIcon from '@mui/icons-material/Contacts'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
 import { clearToken } from '@/utils/auth'
 import { ME_KEY, useAccess } from '@/hooks/useMe'
@@ -42,6 +43,7 @@ const navItems: { label: string; to: string; icon: ReactNode; permission?: Permi
   { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Products', to: '/products', icon: <Inventory2Icon />, permission: 'products.view' },
   { label: 'Orders', to: '/orders', icon: <ReceiptLongIcon />, permission: 'orders.view' },
+  { label: 'Customers', to: '/customers', icon: <ContactsIcon />, permission: 'orders.view' },
   { label: 'Courier payments', to: '/courier-payments', icon: <PaymentsIcon />, permission: 'payments.view' },
   { label: 'Team', to: '/team', icon: <GroupIcon />, ownerOnly: true },
   { label: 'Settings', to: '/settings', icon: <SettingsIcon />, permission: 'settings.view' },

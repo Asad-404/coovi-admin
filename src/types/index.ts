@@ -106,6 +106,8 @@ export interface Order {
   // Email of the admin who entered a manual order
   createdBy?: string
   internalNotes?: OrderNote[]
+  // Only on the admin order list: the phone is on the block list, so call before shipping
+  blockedPhone?: PhoneBlock
   statusHistory?: StatusChange[]
   editHistory?: DetailEdit[]
   createdAt: string
@@ -273,3 +275,41 @@ export interface DashboardStats {
     courierOwes: { orders: number; total: number }
   }
 }
+
+// A phone on the block list: its orders are still accepted but shown in red
+export interface PhoneBlock {
+  note?: string
+  by: string
+  at: string
+}
+
+// GET /customers: one row per phone, added up from its orders
+export interface Customer {
+  phone: string
+  name: string
+  address: string
+  district?: string
+  orders: number
+  delivered: number
+  cancelled: number
+  returned: number
+  // Delivered order totals; only sent to people with money access
+  spent?: number
+  firstOrderAt: string
+  lastOrderAt: string
+  // Two or more refused or cancelled orders
+  risky: boolean
+  blocked: PhoneBlock | null
+}
+
+export interface CustomerPage {
+  customers: Customer[]
+  total: number
+}
+
+export interface CustomerDetail {
+  customer: Customer
+  orders: Pick<Order, '_id' | 'orderNumber' | 'customerName' | 'status' | 'total' | 'createdAt'>[]
+}
+
+export type CustomerSort = 'recent' | 'orders' | 'refused'
