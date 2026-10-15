@@ -66,4 +66,21 @@ describe('actorLabel', () => {
     expect(actorLabel('customer')).toBe('Customer')
     expect(actorLabel('admin@coovi.com')).toBe('admin@coovi.com')
   })
+
+  it('shows the call confirmation as yes or no', () => {
+    const order = makeOrder({
+      editHistory: [
+        {
+          _id: 'e1',
+          changes: [{ field: 'callConfirmed', from: 'no', to: 'yes' }],
+          by: 'admin@coovi.com',
+          at: '2026-10-01T13:00:00.000Z',
+        },
+      ],
+    })
+    expect(buildTimeline(order)[0]).toMatchObject({
+      text: 'Edited confirmed by call',
+      details: ['Confirmed by call: no → yes'],
+    })
+  })
 })
