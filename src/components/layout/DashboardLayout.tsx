@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import {
@@ -28,21 +29,23 @@ import MenuIcon from '@mui/icons-material/Menu'
 import SettingsIcon from '@mui/icons-material/Settings'
 import GroupIcon from '@mui/icons-material/Group'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
-import { clearToken, isOwner } from '@/utils/auth'
+import { clearToken } from '@/utils/auth'
+import { ME_KEY, useAccess } from '@/hooks/useMe'
+import type { Permission } from '@/utils/permissions'
 import { useOrders, useOrderSync } from '@/hooks/useOrders'
 import { countPending } from '@/utils/orderSync'
 import { pendingTitle } from '@/utils/pendingOrders'
 
 const drawerWidth = 240
 
-// ownerOnly pages are hidden from staff (and refused by the API)
-const navItems = [
+// Pages are shown only to people with their permission (the API refuses the rest too)
+const navItems: { label: string; to: string; icon: ReactNode; permission?: Permission; ownerOnly?: boolean }[] = [
   { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
-  { label: 'Products', to: '/products', icon: <Inventory2Icon /> },
-  { label: 'Orders', to: '/orders', icon: <ReceiptLongIcon /> },
-  { label: 'Courier payments', to: '/courier-payments', icon: <PaymentsIcon />, ownerOnly: true },
+  { label: 'Products', to: '/products', icon: <Inventory2Icon />, permission: 'products.view' },
+  { label: 'Orders', to: '/orders', icon: <ReceiptLongIcon />, permission: 'orders.view' },
+  { label: 'Courier payments', to: '/courier-payments', icon: <PaymentsIcon />, permission: 'payments.view' },
   { label: 'Team', to: '/team', icon: <GroupIcon />, ownerOnly: true },
-  { label: 'Settings', to: '/settings', icon: <SettingsIcon />, ownerOnly: true },
+  { label: 'Settings', to: '/settings', icon: <SettingsIcon />, permission: 'settings.view' },
 ]
 
 export default function DashboardLayout() {
@@ -53,12 +56,19 @@ export default function DashboardLayout() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
-  const owner = isOwner()
+  const { isOwner, can } = useAccess()
+  const canSeeOrders = can('orders.view')
+
+  // Re-read the signed-in person's access on every page change, so changes the owner
+  // makes on the Team page show up on their next click
+  useEffect(() => {
+    queryClient.invalidateQueries({ queryKey: ME_KEY })
+  }, [location.pathname, queryClient])
 
   // Orders changed anywhere (new orders, cancels, edits on another device) are merged in
   // every minute without a page reload; the badge and tab title count the Pending ones
-  useOrderSync()
-  const { data: orders } = useOrders()
+  useOrderSync(canSeeOrders)
+  const { data: orders } = useOrders(canSeeOrders)
   const pendingCount = orders ? countPending(orders) : 0
 
   useEffect(() => {
@@ -82,24 +92,26 @@ export default function DashboardLayout() {
       <Toolbar />
       <Divider />
       <List>
-        {navItems.filter((item) => owner || !item.ownerOnly).map((item) => (
-          <ListItemButton
-            key={item.to}
-            selected={location.pathname.startsWith(item.to)}
-            onClick={() => go(item.to)}
-          >
-            <ListItemIcon>
-              {item.to === '/orders' ? (
-                <Badge badgeContent={pendingCount} color="error" aria-label={`${pendingCount} pending orders`}>
-                  {item.icon}
-                </Badge>
-              ) : (
-                item.icon
-              )}
-            </ListItemIcon>
-            <ListItemText primary={item.label} />
-          </ListItemButton>
-        ))}
+        {navItems
+          .filter((item) => (item.ownerOnly ? isOwner : !item.permission || can(item.permission)))
+          .map((item) => (
+            <ListItemButton
+              key={item.to}
+              selected={location.pathname.startsWith(item.to)}
+              onClick={() => go(item.to)}
+            >
+              <ListItemIcon>
+                {item.to === '/orders' ? (
+                  <Badge badgeContent={pendingCount} color="error" aria-label={`${pendingCount} pending orders`}>
+                    {item.icon}
+                  </Badge>
+                ) : (
+                  item.icon
+                )}
+              </ListItemIcon>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
       </List>
     </>
   )

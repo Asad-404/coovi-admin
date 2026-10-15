@@ -1,5 +1,6 @@
 import apiClient from './client.ts'
 import type { Admin, AdminRole } from '@/types'
+import type { Permission } from '@/utils/permissions'
 
 export interface NewTeamMember {
   email: string
@@ -8,7 +9,7 @@ export interface NewTeamMember {
   password: string
 }
 
-export type TeamMemberUpdate = Partial<{ name: string; role: AdminRole; active: boolean }>
+export type TeamMemberUpdate = Partial<{ name: string; role: AdminRole; permissions: Permission[]; active: boolean }>
 
 // Team logins; every route is owner only on the API
 export const adminsApi = {

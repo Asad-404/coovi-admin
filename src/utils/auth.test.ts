@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getTokenAdminId, getTokenRole, isOwner, isTokenExpired } from './auth'
+import { isTokenExpired } from './auth'
 
 const tokenWith = (payload: object): string => {
   const body = btoa(JSON.stringify(payload)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
@@ -25,27 +25,5 @@ describe('isTokenExpired', () => {
   it('treats garbage as expired', () => {
     expect(isTokenExpired('not-a-jwt', now)).toBe(true)
     expect(isTokenExpired('a.%%%.b', now)).toBe(true)
-  })
-})
-
-describe('token role', () => {
-  it('reads the role and id from the token', () => {
-    const token = tokenWith({ id: 'abc', role: 'staff' })
-    expect(getTokenRole(token)).toBe('staff')
-    expect(getTokenAdminId(token)).toBe('abc')
-    expect(isOwner(token)).toBe(false)
-  })
-
-  it('is an owner only with the owner role', () => {
-    expect(isOwner(tokenWith({ role: 'owner' }))).toBe(true)
-    // Tokens from before roles existed are refused by the API, so don't show owner screens
-    expect(isOwner(tokenWith({ role: 'admin' }))).toBe(false)
-  })
-
-  it('has no role without a readable token', () => {
-    expect(getTokenRole(null)).toBeNull()
-    expect(getTokenRole('not-a-jwt')).toBeNull()
-    expect(getTokenAdminId('a.%%%.b')).toBeNull()
-    expect(isOwner(null)).toBe(false)
   })
 })

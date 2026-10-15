@@ -6,17 +6,19 @@ import { ORDER_SYNC_MS, mergeOrders, syncSince } from '@/utils/orderSync'
 
 export const ORDERS_KEY = ['orders'] as const
 
-// Every order, from one shared cache that useOrderSync keeps fresh
-export const useOrders = () =>
-  useQuery({ queryKey: ORDERS_KEY, queryFn: ordersApi.getAll, select: (list: OrderList) => list.orders })
+// Every order, from one shared cache that useOrderSync keeps fresh.
+// enabled: false for someone without orders.view (the API would refuse it).
+export const useOrders = (enabled = true) =>
+  useQuery({ queryKey: ORDERS_KEY, queryFn: ordersApi.getAll, select: (list: OrderList) => list.orders, enabled })
 
 // While the admin is open, asks the API every minute (and on returning to the tab) for
 // orders created or changed since the last check, and merges them into the cached list.
 // New orders, cancels, status changes and edits made on another device show up without a reload.
-export function useOrderSync(): void {
+export function useOrderSync(enabled = true): void {
   const queryClient = useQueryClient()
 
   useEffect(() => {
+    if (!enabled) return
     let running = false
 
     const sync = async () => {
@@ -49,5 +51,5 @@ export function useOrderSync(): void {
       clearInterval(timer)
       document.removeEventListener('visibilitychange', onVisible)
     }
-  }, [queryClient])
+  }, [queryClient, enabled])
 }

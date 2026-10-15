@@ -27,7 +27,8 @@ import { useLowStockThreshold } from '@/api/settings'
 import { countByStatus, dailyRevenue, lowStockProducts, revenueOf } from '@/utils/dashboardStats'
 import { formatPrice } from '@/utils/format'
 import { STATUSES, statusColor } from '@/utils/orderStatus'
-import { isOwner } from '@/utils/auth'
+import { useAccess } from '@/hooks/useMe'
+import { roleLabel } from '@/utils/permissions'
 
 const RANGES = [7, 14, 30] as const
 
@@ -59,20 +60,26 @@ function StatTile({ label, loading, value, hint, onClick }: StatTileProps) {
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [range, setRange] = useState<(typeof RANGES)[number]>(14)
-  // Staff don't see money: no revenue tile or chart
-  const owner = isOwner()
-  const tileWidth = owner ? 3 : 4
+
+  // Each part shows only with its permission: revenue needs money.view
+  const { can } = useAccess()
+  const canSeeMoney = can('money.view')
+  const canSeeOrders = can('orders.view')
+  const canSeeProducts = can('products.view')
+  const tileCount = [canSeeOrders, canSeeMoney, canSeeProducts, canSeeProducts].filter(Boolean).length
+  const tileWidth = 12 / Math.max(tileCount, 1)
 
   const { data: admin, isLoading: adminLoading, isError: adminError } = useQuery({
     queryKey: ['me'],
     queryFn: authApi.me,
   })
 
-  const { data: orders, isLoading: ordersLoading } = useOrders()
+  const { data: orders, isLoading: ordersLoading } = useOrders(canSeeOrders)
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ['products'],
     queryFn: productsApi.getAll,
+    enabled: canSeeProducts,
   })
 
   const lowStockThreshold = useLowStockThreshold()
@@ -108,7 +115,7 @@ export default function DashboardPage() {
               </Typography>
               <Stack direction="row" spacing={1}>
                 <Chip label={admin?.email ?? ''} />
-                <Chip label={admin?.role ?? ''} color="primary" />
+                <Chip label={admin ? `${roleLabel(admin.role)}${admin.customized ? ' (custom)' : ''}` : ''} color="primary" />
               </Stack>
             </Stack>
           )}
@@ -117,15 +124,17 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
-          <StatTile
-            label="Total Orders"
-            loading={ordersLoading}
-            value={<Typography variant="h4">{allOrders.length}</Typography>}
-            onClick={() => navigate('/orders')}
-          />
-        </Grid>
-        {owner && (
+        {canSeeOrders && (
+          <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
+            <StatTile
+              label="Total Orders"
+              loading={ordersLoading}
+              value={<Typography variant="h4">{allOrders.length}</Typography>}
+              onClick={() => navigate('/orders')}
+            />
+          </Grid>
+        )}
+        {canSeeMoney && (
           <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
             <StatTile
               label="Total Revenue"
@@ -135,31 +144,35 @@ export default function DashboardPage() {
             />
           </Grid>
         )}
-        <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
-          <StatTile
-            label="Products"
-            loading={productsLoading}
-            value={<Typography variant="h4">{products?.length ?? 0}</Typography>}
-            onClick={() => navigate('/products')}
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
-          <StatTile
-            label="Low Stock"
-            loading={productsLoading}
-            value={
-              <Typography variant="h4" color={lowStockList.length > 0 ? 'error' : 'text.primary'}>
-                {lowStockList.length}
-              </Typography>
-            }
-            hint={`Fewer than ${lowStockThreshold} left`}
-            onClick={() => navigate('/products?stock=low')}
-          />
-        </Grid>
+        {canSeeProducts && (
+          <>
+            <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
+              <StatTile
+                label="Products"
+                loading={productsLoading}
+                value={<Typography variant="h4">{products?.length ?? 0}</Typography>}
+                onClick={() => navigate('/products')}
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
+              <StatTile
+                label="Low Stock"
+                loading={productsLoading}
+                value={
+                  <Typography variant="h4" color={lowStockList.length > 0 ? 'error' : 'text.primary'}>
+                    {lowStockList.length}
+                  </Typography>
+                }
+                hint={`Fewer than ${lowStockThreshold} left`}
+                onClick={() => navigate('/products?stock=low')}
+              />
+            </Grid>
+          </>
+        )}
       </Grid>
 
-      {/* Revenue over time (owner only) */}
-      {owner && (
+      {/* Revenue over time (needs money.view) */}
+      {canSeeMoney && (
         <Card>
           <CardContent>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 2 }}>
@@ -189,7 +202,7 @@ export default function DashboardPage() {
       )}
 
       {/* Low stock list */}
-      {lowStockList.length > 0 && (
+      {canSeeProducts && lowStockList.length > 0 && (
         <Card>
           <CardContent>
             <Typography variant="h6" gutterBottom>
@@ -197,7 +210,10 @@ export default function DashboardPage() {
             </Typography>
             <List dense disablePadding>
               {lowStockList.slice(0, 8).map((product) => (
-                <ListItemButton key={product._id} onClick={() => navigate(`/products/${product.slug}/edit`)}>
+                <ListItemButton
+                  key={product._id}
+                  onClick={() => navigate(can('products.edit') ? `/products/${product.slug}/edit` : '/products?stock=low')}
+                >
                   <ListItemText primary={product.name} secondary={product.slug} />
                   <Chip
                     size="small"
@@ -217,27 +233,29 @@ export default function DashboardPage() {
       )}
 
       {/* Orders by Status — each chip opens the Orders page filtered to that status */}
-      <Card>
-        <CardContent>
-          <Typography variant="h6" gutterBottom>
-            Orders by Status
-          </Typography>
-          {ordersLoading ? (
-            <Skeleton variant="text" width={400} height={40} />
-          ) : (
-            <Stack direction="row" sx={{ flexWrap: 'wrap', mt: 2, gap: 1 }}>
-              {STATUSES.map((status) => (
-                <Chip
-                  key={status}
-                  label={`${status}: ${ordersByStatus[status]}`}
-                  color={statusColor[status]}
-                  onClick={() => navigate(`/orders?status=${status}`)}
-                />
-              ))}
-            </Stack>
-          )}
-        </CardContent>
-      </Card>
+      {canSeeOrders && (
+        <Card>
+          <CardContent>
+            <Typography variant="h6" gutterBottom>
+              Orders by Status
+            </Typography>
+            {ordersLoading ? (
+              <Skeleton variant="text" width={400} height={40} />
+            ) : (
+              <Stack direction="row" sx={{ flexWrap: 'wrap', mt: 2, gap: 1 }}>
+                {STATUSES.map((status) => (
+                  <Chip
+                    key={status}
+                    label={`${status}: ${ordersByStatus[status]}`}
+                    color={statusColor[status]}
+                    onClick={() => navigate(`/orders?status=${status}`)}
+                  />
+                ))}
+              </Stack>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </Stack>
   )
 }
