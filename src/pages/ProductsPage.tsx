@@ -33,6 +33,7 @@ import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
 import { useLowStockThreshold } from '@/api/settings'
 import { useNotify } from '@/notify/context'
+import { isOwner } from '@/utils/auth'
 import { formatPrice } from '@/utils/format'
 import { categoriesOf, filterProducts } from '@/utils/productFilters'
 import type { ProductSort, StockFilter } from '@/utils/productFilters'
@@ -46,6 +47,7 @@ export default function ProductsPage() {
   const notify = useNotify()
   const [searchParams, setSearchParams] = useSearchParams()
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const owner = isOwner()
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -221,13 +223,16 @@ export default function ProductsPage() {
                       >
                         <EditIcon />
                       </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => setDeleteTarget(product)}
-                        aria-label={`Delete ${product.name}`}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {/* Only owners delete; staff switch a product off in its form instead */}
+                      {owner && (
+                        <IconButton
+                          color="error"
+                          onClick={() => setDeleteTarget(product)}
+                          aria-label={`Delete ${product.name}`}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

@@ -139,11 +139,16 @@ export type OrderDetailsUpdate = Partial<
   Pick<Order, 'customerName' | 'phone' | 'address' | 'notes' | 'district' | 'deliveryArea'>
 >
 
+// owner: everything. staff: orders and products only. 'admin' is the role
+// accounts had before roles existed; the API turns it into 'owner'.
+export type AdminRole = 'owner' | 'staff'
+
 export interface Admin {
   _id: string
   email: string
   name: string
-  role: string
+  role: AdminRole | 'admin'
+  active?: boolean
   createdAt?: string
   updatedAt?: string
 }

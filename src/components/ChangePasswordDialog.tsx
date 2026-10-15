@@ -13,6 +13,7 @@ import {
   TextField,
 } from '@mui/material'
 import { authApi } from '@/api/auth'
+import { setToken } from '@/utils/auth'
 import { getErrorMessage } from '@/api/errors'
 
 interface ChangePasswordDialogProps {
@@ -42,7 +43,10 @@ export default function ChangePasswordDialog({ open, onClose }: ChangePasswordDi
 
   const mutation = useMutation({
     mutationFn: () => authApi.changePassword(currentPassword, newPassword),
-    onSuccess: () => setDone(true),
+    onSuccess: (token) => {
+      setToken(token)
+      setDone(true)
+    },
     onError: (err) => setError(getErrorMessage(err, 'Could not change the password')),
   })
 
@@ -66,7 +70,7 @@ export default function ChangePasswordDialog({ open, onClose }: ChangePasswordDi
       <DialogContent>
         {done ? (
           <Alert severity="success" sx={{ mt: 1 }}>
-            Your password was changed. Use the new one next time you sign in.
+            Your password was changed. Every other device and browser has been signed out; this one stays signed in.
           </Alert>
         ) : (
           <Stack spacing={2} sx={{ mt: 1 }}>

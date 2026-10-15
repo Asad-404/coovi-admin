@@ -26,20 +26,23 @@ import LogoutIcon from '@mui/icons-material/Logout'
 import LockResetIcon from '@mui/icons-material/LockReset'
 import MenuIcon from '@mui/icons-material/Menu'
 import SettingsIcon from '@mui/icons-material/Settings'
+import GroupIcon from '@mui/icons-material/Group'
 import ChangePasswordDialog from '@/components/ChangePasswordDialog'
-import { clearToken } from '@/utils/auth'
+import { clearToken, isOwner } from '@/utils/auth'
 import { useOrders, useOrderSync } from '@/hooks/useOrders'
 import { countPending } from '@/utils/orderSync'
 import { pendingTitle } from '@/utils/pendingOrders'
 
 const drawerWidth = 240
 
+// ownerOnly pages are hidden from staff (and refused by the API)
 const navItems = [
   { label: 'Dashboard', to: '/dashboard', icon: <DashboardIcon /> },
   { label: 'Products', to: '/products', icon: <Inventory2Icon /> },
   { label: 'Orders', to: '/orders', icon: <ReceiptLongIcon /> },
-  { label: 'Courier payments', to: '/courier-payments', icon: <PaymentsIcon /> },
-  { label: 'Settings', to: '/settings', icon: <SettingsIcon /> },
+  { label: 'Courier payments', to: '/courier-payments', icon: <PaymentsIcon />, ownerOnly: true },
+  { label: 'Team', to: '/team', icon: <GroupIcon />, ownerOnly: true },
+  { label: 'Settings', to: '/settings', icon: <SettingsIcon />, ownerOnly: true },
 ]
 
 export default function DashboardLayout() {
@@ -50,6 +53,7 @@ export default function DashboardLayout() {
   const isDesktop = useMediaQuery(theme.breakpoints.up('md'))
   const [mobileOpen, setMobileOpen] = useState(false)
   const [passwordOpen, setPasswordOpen] = useState(false)
+  const owner = isOwner()
 
   // Orders changed anywhere (new orders, cancels, edits on another device) are merged in
   // every minute without a page reload; the badge and tab title count the Pending ones
@@ -78,7 +82,7 @@ export default function DashboardLayout() {
       <Toolbar />
       <Divider />
       <List>
-        {navItems.map((item) => (
+        {navItems.filter((item) => owner || !item.ownerOnly).map((item) => (
           <ListItemButton
             key={item.to}
             selected={location.pathname.startsWith(item.to)}

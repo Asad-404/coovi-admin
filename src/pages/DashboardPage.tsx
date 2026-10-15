@@ -27,6 +27,7 @@ import { useLowStockThreshold } from '@/api/settings'
 import { countByStatus, dailyRevenue, lowStockProducts, revenueOf } from '@/utils/dashboardStats'
 import { formatPrice } from '@/utils/format'
 import { STATUSES, statusColor } from '@/utils/orderStatus'
+import { isOwner } from '@/utils/auth'
 
 const RANGES = [7, 14, 30] as const
 
@@ -58,6 +59,9 @@ function StatTile({ label, loading, value, hint, onClick }: StatTileProps) {
 export default function DashboardPage() {
   const navigate = useNavigate()
   const [range, setRange] = useState<(typeof RANGES)[number]>(14)
+  // Staff don't see money: no revenue tile or chart
+  const owner = isOwner()
+  const tileWidth = owner ? 3 : 4
 
   const { data: admin, isLoading: adminLoading, isError: adminError } = useQuery({
     queryKey: ['me'],
@@ -113,7 +117,7 @@ export default function DashboardPage() {
 
       {/* Stats Grid */}
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
           <StatTile
             label="Total Orders"
             loading={ordersLoading}
@@ -121,15 +125,17 @@ export default function DashboardPage() {
             onClick={() => navigate('/orders')}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <StatTile
-            label="Total Revenue"
-            loading={ordersLoading}
-            value={<Typography variant="h4">{formatPrice(totalRevenue)}</Typography>}
-            hint="Excludes cancelled orders"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        {owner && (
+          <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
+            <StatTile
+              label="Total Revenue"
+              loading={ordersLoading}
+              value={<Typography variant="h4">{formatPrice(totalRevenue)}</Typography>}
+              hint="Excludes cancelled orders"
+            />
+          </Grid>
+        )}
+        <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
           <StatTile
             label="Products"
             loading={productsLoading}
@@ -137,7 +143,7 @@ export default function DashboardPage() {
             onClick={() => navigate('/products')}
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, md: tileWidth }}>
           <StatTile
             label="Low Stock"
             loading={productsLoading}
@@ -152,33 +158,35 @@ export default function DashboardPage() {
         </Grid>
       </Grid>
 
-      {/* Revenue over time */}
-      <Card>
-        <CardContent>
-          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 2 }}>
-            <Stack>
-              <Typography variant="h6">Revenue, last {range} days</Typography>
-              <Typography variant="body2" color="text.secondary">
-                {ordersLoading ? '…' : `${formatPrice(rangeRevenue)} · cancelled orders excluded`}
-              </Typography>
+      {/* Revenue over time (owner only) */}
+      {owner && (
+        <Card>
+          <CardContent>
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1, mb: 2 }}>
+              <Stack>
+                <Typography variant="h6">Revenue, last {range} days</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {ordersLoading ? '…' : `${formatPrice(rangeRevenue)} · cancelled orders excluded`}
+                </Typography>
+              </Stack>
+              <ToggleButtonGroup
+                size="small"
+                exclusive
+                value={range}
+                onChange={(_, value) => value && setRange(value)}
+                aria-label="Date range"
+              >
+                {RANGES.map((r) => (
+                  <ToggleButton key={r} value={r}>
+                    {r}d
+                  </ToggleButton>
+                ))}
+              </ToggleButtonGroup>
             </Stack>
-            <ToggleButtonGroup
-              size="small"
-              exclusive
-              value={range}
-              onChange={(_, value) => value && setRange(value)}
-              aria-label="Date range"
-            >
-              {RANGES.map((r) => (
-                <ToggleButton key={r} value={r}>
-                  {r}d
-                </ToggleButton>
-              ))}
-            </ToggleButtonGroup>
-          </Stack>
-          {ordersLoading ? <Skeleton variant="rounded" height={180} /> : <RevenueChart data={daily} />}
-        </CardContent>
-      </Card>
+            {ordersLoading ? <Skeleton variant="rounded" height={180} /> : <RevenueChart data={daily} />}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Low stock list */}
       {lowStockList.length > 0 && (

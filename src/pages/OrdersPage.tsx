@@ -35,6 +35,7 @@ import type { DeliveryArea, Order, OrderSource, OrderStatus, StatusUpdate } from
 import OrderDetailModal from '@/components/OrderDetailModal'
 import StatusChangeDialog from '@/components/StatusChangeDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
+import { isOwner } from '@/utils/auth'
 import { filterOrders } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
 import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
@@ -121,16 +122,19 @@ export default function OrdersPage() {
           <Button variant="contained" startIcon={<AddIcon />} component={RouterLink} to="/orders/new">
             Add order
           </Button>
-          <Button
-            variant="outlined"
-            startIcon={<DownloadIcon />}
-            disabled={!filteredOrders?.length}
-            onClick={() =>
-              downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
-            }
-          >
-            Export CSV
-          </Button>
+          {/* Owner only: a file of every customer's name, phone and address */}
+          {isOwner() && (
+            <Button
+              variant="outlined"
+              startIcon={<DownloadIcon />}
+              disabled={!filteredOrders?.length}
+              onClick={() =>
+                downloadCsv(`coovi-orders-${new Date().toISOString().slice(0, 10)}.csv`, ordersToCsv(filteredOrders ?? []))
+              }
+            >
+              Export CSV
+            </Button>
+          )}
         </Stack>
       </Stack>
 
