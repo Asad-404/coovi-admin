@@ -20,6 +20,55 @@ export const checkImageFile = (file: File): string | null => {
   return null
 }
 
+// Share image: the wide picture Facebook, Messenger and WhatsApp show when a product link is shared.
+// 1200x630 is Facebook's recommended size; WhatsApp often skips preview images above about 300 KB
+export const SHARE_IMAGE_WIDTH = 1200
+export const SHARE_IMAGE_HEIGHT = 630
+export const MAX_SHARE_IMAGE_BYTES = 300 * 1024
+// Below this Facebook shows a small thumbnail instead of the big preview
+const MIN_SHARE_IMAGE_WIDTH = 600
+
+export interface ImageSize {
+  width: number
+  height: number
+}
+
+// Returns why a picked share image should not be used, or null when it is fine.
+// Any 1.91:1 picture of at least 600 px wide passes, so 1200x630 and 1201x630 both work
+export const checkShareImage = (file: File, size: ImageSize): string | null => {
+  const problem = checkImageFile(file)
+  if (problem) return problem
+  const wanted = `${SHARE_IMAGE_WIDTH} x ${SHARE_IMAGE_HEIGHT} px`
+  const ratio = size.width / size.height
+  const wantedRatio = SHARE_IMAGE_WIDTH / SHARE_IMAGE_HEIGHT
+  if (Math.abs(ratio - wantedRatio) / wantedRatio > 0.02) {
+    return `${file.name} is ${size.width} x ${size.height} px. A share image must be a wide ${wanted} picture`
+  }
+  if (size.width < MIN_SHARE_IMAGE_WIDTH) {
+    return `${file.name} is ${size.width} x ${size.height} px, too small. Use ${wanted}`
+  }
+  if (file.size > MAX_SHARE_IMAGE_BYTES) {
+    return `${file.name} is ${Math.round(file.size / 1024)} KB. Save it as a JPG under 300 KB so WhatsApp shows it`
+  }
+  return null
+}
+
+// Reads a picked image's width and height in the browser
+export const readImageSize = (file: File): Promise<ImageSize> =>
+  new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    }
+    img.onerror = () => {
+      URL.revokeObjectURL(url)
+      reject(new Error(`Could not read ${file.name} as an image`))
+    }
+    img.src = url
+  })
+
 // Adds uploaded URLs as new lines below whatever is already in the URL box
 export const appendImageUrls = (text: string, urls: string[]): string =>
   [text.trimEnd(), ...urls].filter(Boolean).join('\n')
