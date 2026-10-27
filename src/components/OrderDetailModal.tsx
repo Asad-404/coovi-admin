@@ -17,6 +17,7 @@ import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
+import CourierSection from '@/components/CourierSection'
 import OrderTimeline from '@/components/OrderTimeline'
 import CustomerSummary from '@/components/CustomerSummary'
 import { useAccess } from '@/hooks/useMe'
@@ -88,6 +89,8 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
               </Table>
             )}
           </div>
+
+          <CourierSection order={order} canEdit={can('orders.edit')} />
 
           {/* Customer Info */}
           <div>

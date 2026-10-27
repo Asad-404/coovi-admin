@@ -53,6 +53,17 @@ export interface OrderItem {
   preorderDays?: number
 }
 
+// The parcel booked with Steadfast. status is the courier's own delivery
+// status (in_review, pending, hold, delivered, cancelled, ...)
+export interface OrderCourier {
+  name?: 'Steadfast'
+  consignmentId?: number
+  trackingCode?: string
+  status?: string
+  bookedAt?: string
+  statusCheckedAt?: string
+}
+
 // Admin-only order records (the API never sends these to customers).
 // "by" is the admin's email, or 'customer' for the order being placed.
 export interface OrderNote {
@@ -96,6 +107,7 @@ export interface Order {
   paymentMethod: string
   status: OrderStatus
   notes?: string
+  courier?: OrderCourier
   // Why it was cancelled or the parcel came back
   cancelReason?: string
   returnedAt?: string

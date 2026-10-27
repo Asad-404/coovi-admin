@@ -23,6 +23,13 @@ describe('ordersToCsv', () => {
     expect(row).toContain('"say ""hi"""')
   })
 
+  it('adds the courier tracking code as the last column', () => {
+    const csv = ordersToCsv([makeOrder({ courier: { name: 'Steadfast', trackingCode: '15BAEB8A' } })])
+    const [header, row] = csv.split('\r\n')
+    expect(header.endsWith('"Tracking code"')).toBe(true)
+    expect(row.endsWith('"15BAEB8A"')).toBe(true)
+  })
+
   it('adds the cancel or return reason', () => {
     const csv = ordersToCsv([makeOrder({ status: 'Returned', cancelReason: 'Customer refused the parcel' })])
     const row = csv.split('\r\n')[1]
