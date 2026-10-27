@@ -13,11 +13,13 @@ import { formatDate, formatPrice } from '@/utils/format'
 
 interface CourierSectionProps {
   order: Order
+  // Booking and checking need orders.edit; everyone who sees the order sees the tracking code
+  canEdit: boolean
 }
 
 // Books the parcel with Steadfast and shows its tracking code and courier status.
 // Booking is a real request to Steadfast, so it asks once more before sending.
-export default function CourierSection({ order }: CourierSectionProps) {
+export default function CourierSection({ order, canEdit }: CourierSectionProps) {
   const queryClient = useQueryClient()
   const notify = useNotify()
   const [confirming, setConfirming] = useState(false)
@@ -50,7 +52,7 @@ export default function CourierSection({ order }: CourierSectionProps) {
   const courier = order.courier
   const trackingCode = courier?.trackingCode
 
-  if (!trackingCode && !canBookCourier(order)) return null
+  if (!trackingCode && !(canEdit && canBookCourier(order))) return null
 
   return (
     <div>
@@ -92,6 +94,7 @@ export default function CourierSection({ order }: CourierSectionProps) {
                       </Typography>
                     )}
                   </span>
+                  {canEdit && (
                   <Tooltip title="Check with Steadfast">
                     <span>
                       <IconButton
@@ -104,6 +107,7 @@ export default function CourierSection({ order }: CourierSectionProps) {
                       </IconButton>
                     </span>
                   </Tooltip>
+                  )}
                 </Stack>
               </TableCell>
             </TableRow>

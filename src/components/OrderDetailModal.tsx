@@ -90,7 +90,7 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
             )}
           </div>
 
-          <CourierSection order={order} />
+          <CourierSection order={order} canEdit={can('orders.edit')} />
 
           {/* Customer Info */}
           <div>
