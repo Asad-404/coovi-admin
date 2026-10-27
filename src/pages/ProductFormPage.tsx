@@ -19,7 +19,14 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
-import { appendImageUrls, checkImageFile, getUploadErrorMessage, uploadsApi } from '@/api/uploads'
+import {
+  appendImageUrls,
+  checkImageFile,
+  checkShareImage,
+  getUploadErrorMessage,
+  readImageSize,
+  uploadsApi,
+} from '@/api/uploads'
 import { useNotify } from '@/notify/context'
 import { slugify } from '@/utils/format'
 import type { Product } from '@/types'
@@ -41,6 +48,7 @@ interface ProductFormState {
   description: string
   descriptionBn: string
   imagesText: string
+  shareImage: string
 }
 
 const emptyForm: ProductFormState = {
@@ -59,6 +67,7 @@ const emptyForm: ProductFormState = {
   description: '',
   descriptionBn: '',
   imagesText: '',
+  shareImage: '',
 }
 
 const formFromProduct = (p: Product, costPrice: number | null | undefined): ProductFormState => ({
@@ -77,6 +86,7 @@ const formFromProduct = (p: Product, costPrice: number | null | undefined): Prod
   description: p.description ?? '',
   descriptionBn: p.descriptionBn ?? '',
   imagesText: p.images.join('\n'),
+  shareImage: p.shareImage ?? '',
 })
 
 const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/
@@ -207,6 +217,30 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
     }
   }
 
+  // The share image is checked for size and weight before it goes to Cloudinary
+  const handleShareImagePicked = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+
+    setError('')
+    setUploading(true)
+    try {
+      const problem = checkImageFile(file) ?? checkShareImage(file, await readImageSize(file))
+      if (problem) {
+        setError(problem)
+        return
+      }
+      const url = await uploadsApi.uploadImage(file, await uploadsApi.getSignature())
+      setForm((f) => ({ ...f, shareImage: url }))
+      notify('Share image uploaded')
+    } catch (err) {
+      setError(getUploadErrorMessage(err))
+    } finally {
+      setUploading(false)
+    }
+  }
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
     setError('')
@@ -257,6 +291,11 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
       setError(`Not a valid image URL: ${badImage}`)
       return
     }
+    const shareImage = form.shareImage.trim()
+    if (shareImage && !isHttpUrl(shareImage)) {
+      setError(`Not a valid share image URL: ${shareImage}`)
+      return
+    }
 
     saveMutation.mutate({
       name: form.name,
@@ -275,6 +314,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
       description: form.description || undefined,
       descriptionBn: form.descriptionBn || undefined,
       images,
+      shareImage: shareImage || undefined,
     })
   }
 
@@ -451,6 +491,36 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                   />
                 ))}
               </Stack>
+            )}
+
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <Button
+                component="label"
+                variant="outlined"
+                disabled={uploading}
+                startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
+              >
+                {uploading ? 'Uploading…' : 'Upload share image'}
+                <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleShareImagePicked} />
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                1200 x 630 px JPG, under 300 KB. Keep the saree in the middle square
+              </Typography>
+            </Stack>
+            <TextField
+              label="Share image URL (optional)"
+              value={form.shareImage}
+              onChange={(e) => set('shareImage', e.target.value)}
+              helperText="Shown when the product link is shared on Facebook, Messenger or WhatsApp. Empty uses the first photo"
+              fullWidth
+            />
+            {form.shareImage.trim() && (
+              <Avatar
+                variant="rounded"
+                src={form.shareImage.trim()}
+                alt="Share image"
+                sx={{ width: 191, height: 100 }}
+              />
             )}
 
             <TextField

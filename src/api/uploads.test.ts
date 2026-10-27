@@ -4,8 +4,10 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import apiClient from './client'
 import {
   MAX_IMAGE_BYTES,
+  MAX_SHARE_IMAGE_BYTES,
   appendImageUrls,
   checkImageFile,
+  checkShareImage,
   getUploadErrorMessage,
   uploadsApi,
 } from './uploads'
@@ -21,6 +23,35 @@ const SIGNATURE = {
 }
 
 const photo = (name = 'saree.jpg', type = 'image/jpeg') => new File(['x'], name, { type })
+
+describe('checkShareImage', () => {
+  const sized = (bytes: number, type = 'image/jpeg') => new File([new Uint8Array(bytes)], 'share.jpg', { type })
+  const WIDE = { width: 1200, height: 630 }
+
+  it('accepts a 1200 x 630 JPG under 300 KB', () => {
+    expect(checkShareImage(sized(100 * 1024), WIDE)).toBeNull()
+  })
+
+  it('accepts a picture a pixel or two off the exact size', () => {
+    expect(checkShareImage(sized(1000), { width: 1201, height: 630 })).toBeNull()
+  })
+
+  it('rejects a tall saree photo', () => {
+    expect(checkShareImage(sized(1000), { width: 800, height: 1200 })).toMatch(/800 x 1200 px.*1200 x 630/)
+  })
+
+  it('rejects a wide picture that is too small', () => {
+    expect(checkShareImage(sized(1000), { width: 400, height: 210 })).toMatch(/too small/)
+  })
+
+  it('rejects a file over 300 KB', () => {
+    expect(checkShareImage(sized(MAX_SHARE_IMAGE_BYTES + 1), WIDE)).toMatch(/under 300 KB/)
+  })
+
+  it('rejects a file that is not an image', () => {
+    expect(checkShareImage(sized(1000, 'application/pdf'), WIDE)).toMatch(/not an image/)
+  })
+})
 
 describe('checkImageFile', () => {
   it('accepts a normal photo', () => {

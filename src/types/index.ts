@@ -28,6 +28,8 @@ export interface Product {
   price: number
   compareAtPrice?: number | null
   images: string[]
+  // Wide 1200x630 picture for social media link previews; without it the first photo is used
+  shareImage?: string
   size?: string
   category: string
   stock: number
