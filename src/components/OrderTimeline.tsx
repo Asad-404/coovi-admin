@@ -7,9 +7,8 @@ import SwapHorizIcon from '@mui/icons-material/SwapHoriz'
 import EditNoteIcon from '@mui/icons-material/EditNote'
 import { ordersApi } from '@/api/orders'
 import { getErrorMessage } from '@/api/errors'
-import type { Order, OrderList } from '@/types'
+import type { Order } from '@/types'
 import { ORDERS_KEY } from '@/hooks/useOrders'
-import { mergeOrders } from '@/utils/orderSync'
 import { actorLabel, buildTimeline } from '@/utils/orderTimeline'
 import type { TimelineEntry } from '@/utils/orderTimeline'
 import { formatDateTime } from '@/utils/format'
@@ -23,18 +22,16 @@ const ICONS: Record<TimelineEntry['kind'], typeof StickyNote2Icon> = {
 }
 
 // Private notes plus a record of who changed what. Customers never see any of it.
-export default function OrderTimeline({ order }: { order: Order }) {
+// Adding a note needs orders.edit; everyone who can see the order sees the history.
+export default function OrderTimeline({ order, canAddNotes = true }: { order: Order; canAddNotes?: boolean }) {
   const queryClient = useQueryClient()
   const [text, setText] = useState('')
   const [error, setError] = useState('')
 
   const mutation = useMutation({
     mutationFn: (note: string) => ordersApi.addNote(order._id, note),
-    onSuccess: (updated) => {
-      // Show the note at once, then refetch so the list stays in step with the API
-      queryClient.setQueryData<OrderList>(ORDERS_KEY, (latest) =>
-        latest && { ...latest, orders: mergeOrders(latest.orders, [updated]) },
-      )
+    onSuccess: () => {
+      // Refetch the order list so the note shows on this order
       queryClient.invalidateQueries({ queryKey: ORDERS_KEY })
       setText('')
     },
@@ -56,31 +53,33 @@ export default function OrderTimeline({ order }: { order: Order }) {
         Notes and history (only admins see this)
       </Typography>
 
-      <Stack spacing={1} component="form" onSubmit={handleSubmit} sx={{ mb: 2 }}>
-        {error && <Alert severity="error">{error}</Alert>}
-        <TextField
-          placeholder="Add a private note, e.g. called, will pay on Friday"
-          aria-label="Private note"
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          multiline
-          minRows={2}
-          size="small"
-          helperText={`${text.length}/${NOTE_MAX}. Notes can't be edited or deleted later.`}
-          slotProps={{ htmlInput: { maxLength: NOTE_MAX } }}
-        />
-        <Box>
-          <Button
-            type="submit"
-            variant="outlined"
+      {canAddNotes && (
+        <Stack spacing={1} component="form" onSubmit={handleSubmit} sx={{ mb: 2 }}>
+          {error && <Alert severity="error">{error}</Alert>}
+          <TextField
+            placeholder="Add a private note, e.g. called, will pay on Friday"
+            aria-label="Private note"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            multiline
+            minRows={2}
             size="small"
-            disabled={mutation.isPending}
-            startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
-          >
-            Add note
-          </Button>
-        </Box>
-      </Stack>
+            helperText={`${text.length}/${NOTE_MAX}. Notes can't be edited or deleted later.`}
+            slotProps={{ htmlInput: { maxLength: NOTE_MAX } }}
+          />
+          <Box>
+            <Button
+              type="submit"
+              variant="outlined"
+              size="small"
+              disabled={mutation.isPending}
+              startIcon={mutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
+            >
+              Add note
+            </Button>
+          </Box>
+        </Stack>
+      )}
 
       <Stack spacing={1.5}>
         {timeline.map((entry) => {

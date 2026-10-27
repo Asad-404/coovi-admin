@@ -1,3 +1,5 @@
+import type { Permission, Role } from '@/utils/permissions'
+
 // Types matching the REAL coovi-api responses (see API_ENDPOINTS.md)
 
 export type OrderStatus = 'Pending' | 'Processing' | 'Shipped' | 'Delivered' | 'Cancelled' | 'Returned'
@@ -33,6 +35,8 @@ export interface Product {
   // Out of stock pre-orders: allowed when on, shipping in about preorderDays
   allowPreorder?: boolean
   preorderDays?: number
+  // Only sent by the admin with money access; never returned by the product list
+  costPrice?: number | null
   createdAt: string
   updatedAt: string
 }
@@ -114,6 +118,8 @@ export interface Order {
   // Email of the admin who entered a manual order
   createdBy?: string
   internalNotes?: OrderNote[]
+  // Only on the admin order list: the phone is on the block list, so call before shipping
+  blockedPhone?: PhoneBlock
   statusHistory?: StatusChange[]
   editHistory?: DetailEdit[]
   createdAt: string
@@ -140,10 +146,11 @@ export interface ManualOrderInput {
   discount?: number
 }
 
-// The admin's cached order list and the server clock it was fetched at (see utils/orderSync.ts)
-export interface OrderList {
+// One page of the admin order list (GET /orders with filters)
+export interface OrderPage {
   orders: Order[]
-  serverTime?: string
+  // How many orders match the filters across every page
+  total: number
 }
 
 // Fields an admin may correct on an existing order
@@ -151,11 +158,20 @@ export type OrderDetailsUpdate = Partial<
   Pick<Order, 'customerName' | 'phone' | 'address' | 'notes' | 'district' | 'deliveryArea'>
 >
 
+// Roles and permissions are in src/utils/permissions.ts. 'admin' is the role
+// accounts had before roles existed; the API turns it into 'owner'.
+export type AdminRole = Role
+
 export interface Admin {
   _id: string
   email: string
   name: string
-  role: string
+  role: AdminRole | 'admin'
+  active?: boolean
+  // What this person can do (every permission for owners)
+  permissions?: Permission[]
+  // Their ticks differ from their role's preset
+  customized?: boolean
   createdAt?: string
   updatedAt?: string
 }
@@ -241,3 +257,71 @@ export interface ShopSettings {
   lowStockThreshold: number
   updatedAt?: string
 }
+
+// GET /stats: orders placed in the range. `money` and the `value` fields are only
+// there for people with money access.
+export interface DashboardStats {
+  range: { from: string; to: string; days: number }
+  orders: {
+    total: number
+    byStatus: Record<OrderStatus, number>
+    bySource: Record<string, number>
+    byArea: { inside_dhaka: number; outside_dhaka: number }
+    withPreorder: number
+    refusedRate: number | null
+  }
+  pipeline: { toConfirm: number; toShip: number; onTheWay: number; preordersWaiting: number }
+  daily: { date: string; orders: number; value?: number }[]
+  bestSellers: { productId: string; name: string; quantity: number; value?: number }[]
+  topDistricts: { district: string; orders: number }[]
+  money?: {
+    deliveredRevenue: number
+    deliveredOrders: number
+    orderValue: number
+    averageOrderValue: number | null
+    deliveryFees: number
+    cost: number
+    grossProfit: number
+    profitOrders: number
+    unknownCostOrders: number
+    courierOwes: { orders: number; total: number }
+  }
+}
+
+// A phone on the block list: its orders are still accepted but shown in red
+export interface PhoneBlock {
+  note?: string
+  by: string
+  at: string
+}
+
+// GET /customers: one row per phone, added up from its orders
+export interface Customer {
+  phone: string
+  name: string
+  address: string
+  district?: string
+  orders: number
+  delivered: number
+  cancelled: number
+  returned: number
+  // Delivered order totals; only sent to people with money access
+  spent?: number
+  firstOrderAt: string
+  lastOrderAt: string
+  // Two or more refused or cancelled orders
+  risky: boolean
+  blocked: PhoneBlock | null
+}
+
+export interface CustomerPage {
+  customers: Customer[]
+  total: number
+}
+
+export interface CustomerDetail {
+  customer: Customer
+  orders: Pick<Order, '_id' | 'orderNumber' | 'customerName' | 'status' | 'total' | 'createdAt'>[]
+}
+
+export type CustomerSort = 'recent' | 'orders' | 'refused'

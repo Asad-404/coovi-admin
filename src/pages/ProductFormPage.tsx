@@ -23,6 +23,7 @@ import { appendImageUrls, checkImageFile, getUploadErrorMessage, uploadsApi } fr
 import { useNotify } from '@/notify/context'
 import { slugify } from '@/utils/format'
 import type { Product } from '@/types'
+import { useAccess } from '@/hooks/useMe'
 
 interface ProductFormState {
   name: string
@@ -30,6 +31,7 @@ interface ProductFormState {
   slug: string
   price: string
   compareAtPrice: string
+  costPrice: string
   stock: string
   category: string
   size: string
@@ -47,6 +49,7 @@ const emptyForm: ProductFormState = {
   slug: '',
   price: '',
   compareAtPrice: '',
+  costPrice: '',
   stock: '',
   category: 'Saree',
   size: 'Free Size',
@@ -58,12 +61,13 @@ const emptyForm: ProductFormState = {
   imagesText: '',
 }
 
-const formFromProduct = (p: Product): ProductFormState => ({
+const formFromProduct = (p: Product, costPrice: number | null | undefined): ProductFormState => ({
   name: p.name,
   nameBn: p.nameBn ?? '',
   slug: p.slug,
   price: String(p.price),
   compareAtPrice: p.compareAtPrice ? String(p.compareAtPrice) : '',
+  costPrice: costPrice == null ? '' : String(costPrice),
   stock: String(p.stock),
   category: p.category,
   size: p.size ?? '',
@@ -106,24 +110,42 @@ export default function ProductFormPage() {
     enabled: isEdit,
   })
 
-  if (isEdit && isLoading) {
+  // The cost price is kept out of product responses; people with money access load it separately
+  const { can } = useAccess()
+  const canSeeCost = can('money.view')
+  const cost = useQuery({
+    queryKey: ['product-cost', product?._id],
+    queryFn: () => productsApi.getCost(product!._id),
+    enabled: canSeeCost && Boolean(product),
+  })
+
+  if (isEdit && (isLoading || (canSeeCost && cost.isLoading))) {
     return <CircularProgress />
   }
   if (isEdit && (isError || !product)) {
     return <Alert severity="error">Could not load this product — it may have been deleted.</Alert>
   }
+  if (isEdit && canSeeCost && cost.isError) {
+    return <Alert severity="error">Could not load this product's cost price. Try again in a moment.</Alert>
+  }
 
   // key remounts the form (and resets its state) when a different product loads
-  return <ProductForm key={product?._id ?? 'new'} product={product} />
+  return <ProductForm key={product?._id ?? 'new'} product={product} costPrice={cost.data} canSeeCost={canSeeCost} />
 }
 
-function ProductForm({ product }: { product?: Product }) {
+interface ProductFormProps {
+  product?: Product
+  costPrice?: number | null
+  canSeeCost: boolean
+}
+
+function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const notify = useNotify()
   const isEdit = Boolean(product)
 
-  const [form, setForm] = useState<ProductFormState>(() => (product ? formFromProduct(product) : emptyForm))
+  const [form, setForm] = useState<ProductFormState>(() => (product ? formFromProduct(product, costPrice) : emptyForm))
   const [slugEdited, setSlugEdited] = useState(false)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
@@ -137,6 +159,7 @@ function ProductForm({ product }: { product?: Product }) {
       notify(isEdit ? `${saved.name} saved` : `${saved.name} created`)
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['product'] })
+      queryClient.invalidateQueries({ queryKey: ['product-cost'] })
       navigate('/products')
     },
     onError: (err) => setError(getErrorMessage(err, 'Save failed')),
@@ -194,6 +217,7 @@ function ProductForm({ product }: { product?: Product }) {
     const stock = Number(form.stock)
     const compareAtPrice = form.compareAtPrice === '' ? null : Number(form.compareAtPrice)
     const preorderDays = Number(form.preorderDays)
+    const cost = form.costPrice === '' ? null : Number(form.costPrice)
 
     // Same rules as the API's product schema, checked here for a friendlier message
     if (!form.name || !form.slug) {
@@ -210,6 +234,10 @@ function ProductForm({ product }: { product?: Product }) {
     }
     if (compareAtPrice !== null && (!Number.isInteger(compareAtPrice) || compareAtPrice <= price)) {
       setError('Original price must be a whole number higher than the price (or leave it empty for no sale)')
+      return
+    }
+    if (cost !== null && (!Number.isFinite(cost) || cost < 0)) {
+      setError('Cost price must be 0 or more (or leave it empty if you are not sure)')
       return
     }
     if (!Number.isInteger(stock) || stock < 0) {
@@ -236,6 +264,8 @@ function ProductForm({ product }: { product?: Product }) {
       slug: form.slug,
       price,
       compareAtPrice,
+      // Only people with money access send it; left out, the saved cost stays as it is
+      ...(canSeeCost && { costPrice: cost }),
       stock,
       category: form.category || 'Saree',
       size: form.size || undefined,
@@ -333,6 +363,17 @@ function ProductForm({ product }: { product?: Product }) {
                 helperText="Optional. Higher than the price puts the product On Sale"
                 fullWidth
               />
+              {canSeeCost && (
+                <TextField
+                  label="Cost price (BDT)"
+                  slotProps={{ htmlInput: { min: 0, step: 'any' } }}
+                  type="number"
+                  value={form.costPrice}
+                  onChange={(e) => set('costPrice', e.target.value)}
+                  helperText="What you paid for one piece. Only for profit; customers never see it"
+                  fullWidth
+                />
+              )}
               <TextField
                 label="Stock"
                 slotProps={{ htmlInput: { min: 0, step: 1 } }}

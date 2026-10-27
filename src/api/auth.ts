@@ -14,8 +14,10 @@ export const authApi = {
     return res.data.data
   },
 
-  // PATCH /auth/password -> { success, message }; needs the current password
-  changePassword: async (currentPassword: string, newPassword: string): Promise<void> => {
-    await apiClient.patch('/auth/password', { currentPassword, newPassword })
+  // PATCH /auth/password -> { success, data: { token } }; needs the current password.
+  // Every other sign-in stops working; the returned token keeps this one going.
+  changePassword: async (currentPassword: string, newPassword: string): Promise<string> => {
+    const res = await apiClient.patch('/auth/password', { currentPassword, newPassword })
+    return res.data.data.token
   },
 }

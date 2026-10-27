@@ -1,22 +1,26 @@
 import apiClient from './client.ts'
-import { fetchAllPagesWithTime } from './paginate.ts'
-import type { DeliveryOptions, ManualOrderInput, Order, OrderDetailsUpdate, OrderList, StatusUpdate } from '@/types'
+import { fetchAllPages } from './paginate.ts'
+import type { DeliveryOptions, ManualOrderInput, Order, OrderDetailsUpdate, OrderPage, StatusUpdate } from '@/types'
+import type { OrderQuery } from '@/utils/orderFilters'
 
-const ORDER_PAGE_SIZE = 100
+// The API's largest page, used when every matching order is needed (CSV export)
+const EXPORT_PAGE_SIZE = 100
 
 export const ordersApi = {
-  // GET /orders -> { success, data: [...], serverTime, pagination } (admin JWT required) — every page
-  getAll: async (): Promise<OrderList> => {
-    const { items, serverTime } = await fetchAllPagesWithTime<Order>('/orders', ORDER_PAGE_SIZE)
-    return { orders: items, serverTime }
+  // GET /orders?page=&limit=&search=&status=... -> { success, data: [...], pagination }
+  // One page of the orders matching the filters, newest first, plus how many match in all
+  getPage: async (query: OrderQuery, page: number, limit: number): Promise<OrderPage> => {
+    const res = await apiClient.get('/orders', { params: { ...query, page, limit } })
+    return { orders: res.data.data, total: res.data.pagination.total }
   },
 
-  // GET /orders?updatedSince=<time> -> only orders created or changed since then (usually none)
-  getChangedSince: async (since: string): Promise<OrderList> => {
-    const { items, serverTime } = await fetchAllPagesWithTime<Order>('/orders', ORDER_PAGE_SIZE, {
-      updatedSince: since,
-    })
-    return { orders: items, serverTime }
+  // Every order matching the filters, page by page (for the CSV file)
+  getAllMatching: (query: OrderQuery): Promise<Order[]> => fetchAllPages<Order>('/orders', EXPORT_PAGE_SIZE, query),
+
+  // GET /orders?status=Pending&limit=1 -> only the count is read
+  countPending: async (): Promise<number> => {
+    const res = await apiClient.get('/orders', { params: { status: 'Pending', limit: 1 } })
+    return res.data.pagination.total
   },
 
   // POST /orders/manual -> { success, data: order } — an order taken by Facebook, WhatsApp

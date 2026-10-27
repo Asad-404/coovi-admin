@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import apiClient from './client'
-import { fetchAllPages, fetchAllPagesWithTime } from './paginate'
+import { fetchAllPages } from './paginate'
 
 afterEach(() => vi.restoreAllMocks())
 
@@ -19,17 +19,10 @@ describe('fetchAllPages', () => {
     vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: [] } })
     expect(await fetchAllPages('/products', 50)).toEqual([])
   })
-})
 
-describe('fetchAllPagesWithTime', () => {
-  it('returns the server time from the first page', async () => {
-    vi.spyOn(apiClient, 'get').mockImplementation(async (_url, config) => {
-      const page = (config!.params as { page: number }).page
-      return { data: { data: [page], serverTime: `t${page}`, pagination: { pages: 2 } } }
-    })
-    expect(await fetchAllPagesWithTime<number>('/orders', 1, { updatedSince: 'x' })).toEqual({
-      items: [1, 2],
-      serverTime: 't1',
-    })
+  it('sends the filters with every page', async () => {
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: [1], pagination: { pages: 1 } } })
+    await fetchAllPages('/orders', 100, { status: 'Pending' })
+    expect(get).toHaveBeenCalledWith('/orders', { params: { status: 'Pending', page: 1, limit: 100 } })
   })
 })

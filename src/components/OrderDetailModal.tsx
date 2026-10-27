@@ -19,6 +19,8 @@ import EditIcon from '@mui/icons-material/Edit'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
 import CourierSection from '@/components/CourierSection'
 import OrderTimeline from '@/components/OrderTimeline'
+import CustomerSummary from '@/components/CustomerSummary'
+import { useAccess } from '@/hooks/useMe'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
 import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
@@ -34,11 +36,12 @@ interface OrderDetailModalProps {
 
 export default function OrderDetailModal({ order, open, onClose }: OrderDetailModalProps) {
   const [editing, setEditing] = useState(false)
+  const { can } = useAccess()
 
   if (!order) return null
 
-  // The API freezes delivered, cancelled and returned orders
-  const editable = !['Delivered', 'Cancelled', 'Returned'].includes(order.status)
+  // The API freezes delivered, cancelled and returned orders; editing also needs orders.edit
+  const editable = can('orders.edit') && !['Delivered', 'Cancelled', 'Returned'].includes(order.status)
 
   const close = () => {
     setEditing(false)
@@ -52,6 +55,9 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
       </DialogTitle>
       <DialogContent>
         <Stack spacing={3} sx={{ mt: 1 }}>
+          {/* This phone's order history and block mark */}
+          <CustomerSummary phone={order.phone} />
+
           {/* Status */}
           <div>
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
@@ -220,7 +226,7 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
 
           <Divider />
 
-          <OrderTimeline order={order} />
+          <OrderTimeline order={order} canAddNotes={can('orders.edit')} />
         </Stack>
       </DialogContent>
       <DialogActions>

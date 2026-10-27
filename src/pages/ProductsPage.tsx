@@ -33,6 +33,7 @@ import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
 import { useLowStockThreshold } from '@/api/settings'
 import { useNotify } from '@/notify/context'
+import { useAccess } from '@/hooks/useMe'
 import { formatPrice } from '@/utils/format'
 import { categoriesOf, filterProducts } from '@/utils/productFilters'
 import type { ProductSort, StockFilter } from '@/utils/productFilters'
@@ -46,6 +47,7 @@ export default function ProductsPage() {
   const notify = useNotify()
   const [searchParams, setSearchParams] = useSearchParams()
   const [deleteTarget, setDeleteTarget] = useState<Product | null>(null)
+  const { can } = useAccess()
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
@@ -92,13 +94,15 @@ export default function ProductsPage() {
     <Stack spacing={3}>
       <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
         <Typography variant="h4">Products</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => navigate('/products/new')}
-        >
-          Add Product
-        </Button>
+        {can('products.edit') && (
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={() => navigate('/products/new')}
+          >
+            Add Product
+          </Button>
+        )}
       </Stack>
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
@@ -214,20 +218,25 @@ export default function ProductsPage() {
                     </TableCell>
                     <TableCell>{product.category}</TableCell>
                     <TableCell align="right">
-                      <IconButton
-                        color="primary"
-                        onClick={() => navigate(`/products/${product.slug}/edit`)}
-                        aria-label={`Edit ${product.name}`}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => setDeleteTarget(product)}
-                        aria-label={`Delete ${product.name}`}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {can('products.edit') && (
+                        <IconButton
+                          color="primary"
+                          onClick={() => navigate(`/products/${product.slug}/edit`)}
+                          aria-label={`Edit ${product.name}`}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      )}
+                      {/* Needs products.delete; others switch a product off in its form instead */}
+                      {can('products.delete') && (
+                        <IconButton
+                          color="error"
+                          onClick={() => setDeleteTarget(product)}
+                          aria-label={`Delete ${product.name}`}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}

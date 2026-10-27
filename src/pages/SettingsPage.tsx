@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
+  Box,
   Button,
   Card,
   CardContent,
@@ -19,6 +20,7 @@ import { settingsApi } from '@/api/settings'
 import type { SettingsUpdate } from '@/api/settings'
 import { useNotify } from '@/notify/context'
 import type { ShopSettings } from '@/types'
+import { useAccess } from '@/hooks/useMe'
 import {
   ANNOUNCEMENT_MAX,
   announcementError,
@@ -61,6 +63,7 @@ function Section({
   onSubmit: (e: FormEvent) => void
   children: ReactNode
 }) {
+  const canEdit = useAccess().can('settings.edit')
   return (
     <Card component="form" onSubmit={onSubmit} noValidate>
       <CardContent>
@@ -72,17 +75,22 @@ function Section({
             </Typography>
           </div>
           {error && <Alert severity="error">{error}</Alert>}
-          {children}
-          <div>
-            <Button
-              type="submit"
-              variant="contained"
-              disabled={saving}
-              startIcon={saving ? <CircularProgress size={18} color="inherit" /> : undefined}
-            >
-              Save
-            </Button>
-          </div>
+          {/* Without settings.edit the fields are read-only and there is no Save button */}
+          <Box component="fieldset" disabled={!canEdit} sx={{ border: 0, m: 0, p: 0, minWidth: 0 }}>
+            <Stack spacing={2}>{children}</Stack>
+          </Box>
+          {canEdit && (
+            <div>
+              <Button
+                type="submit"
+                variant="contained"
+                disabled={saving}
+                startIcon={saving ? <CircularProgress size={18} color="inherit" /> : undefined}
+              >
+                Save
+              </Button>
+            </div>
+          )}
         </Stack>
       </CardContent>
     </Card>
