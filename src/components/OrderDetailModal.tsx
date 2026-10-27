@@ -20,6 +20,7 @@ import OrderDetailsForm from '@/components/OrderDetailsForm'
 import CourierSection from '@/components/CourierSection'
 import OrderTimeline from '@/components/OrderTimeline'
 import CustomerSummary from '@/components/CustomerSummary'
+import CallConfirmedToggle from '@/components/CallConfirmedToggle'
 import { useAccess } from '@/hooks/useMe'
 import type { Order } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
@@ -64,6 +65,7 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
               Status
             </Typography>
             <Chip label={order.status} color={statusColor[order.status]} />
+            <CallConfirmedToggle order={order} editable={editable} />
             {(order.cancelReason || order.status === 'Returned') && (
               <Table size="small" sx={{ mt: 1 }}>
                 <TableBody>

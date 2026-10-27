@@ -56,6 +56,13 @@ export const ordersApi = {
     return res.data.data
   },
 
+  // PATCH /orders/:id/call-confirmed -> { success, data: order } — the customer was called
+  // and confirmed the order (or undo it); refused on Delivered, Cancelled and Returned orders
+  setCallConfirmed: async (id: string, confirmed: boolean): Promise<Order> => {
+    const res = await apiClient.patch(`/orders/${id}/call-confirmed`, { confirmed })
+    return res.data.data
+  },
+
   // PATCH /orders/:id/status -> { success, data: order }
   updateStatus: async (id: string, change: StatusUpdate): Promise<Order> => {
     const res = await apiClient.patch(`/orders/${id}/status`, change)

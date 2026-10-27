@@ -16,10 +16,12 @@ const FIELD_LABELS: Record<string, string> = {
   deliveryArea: 'Delivery area',
   deliveryFee: 'Delivery fee',
   total: 'Total',
+  callConfirmed: 'Confirmed by call',
 }
 
 // Values arrive as text; show areas and money the way the rest of the admin does
 const shown = (field: string, value?: string) => {
+  if (field === 'callConfirmed') return value === 'yes' ? 'yes' : 'no'
   if (!value) return '(empty)'
   if (field === 'deliveryArea') return DELIVERY_AREA_LABELS[value as DeliveryArea] ?? value
   if (field === 'deliveryFee' || field === 'total') return formatPrice(Number(value))

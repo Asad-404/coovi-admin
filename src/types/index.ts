@@ -90,6 +90,13 @@ export interface DetailEdit {
   at: string
 }
 
+// Who called the customer and confirmed the order, and when
+export interface CallConfirmed {
+  by: string
+  byId?: string
+  at: string
+}
+
 // NOTE: address is a plain string in the real API (not an object)
 export interface Order {
   _id: string
@@ -119,6 +126,8 @@ export interface Order {
   source?: OrderSource
   // Email of the admin who entered a manual order
   createdBy?: string
+  // Set when an admin called the customer and they confirmed the order (manual orders start confirmed)
+  callConfirmed?: CallConfirmed
   internalNotes?: OrderNote[]
   // Only on the admin order list: the phone is on the block list, so call before shipping
   blockedPhone?: PhoneBlock
