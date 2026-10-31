@@ -141,7 +141,7 @@ export default function RecordPaymentDialog({ orders, onClose }: Props) {
                     <TableCell>
                       <TextField
                         size="small"
-                        placeholder="ORD-..."
+                        placeholder="e.g. K7M3QX"
                         value={line.orderNumber}
                         onChange={(e) => setLine(index, { orderNumber: e.target.value, orderTotal: undefined })}
                         slotProps={{ htmlInput: { 'aria-label': `Order number, row ${index + 1}` } }}
