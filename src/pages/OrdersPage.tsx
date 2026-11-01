@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Badge,
   Button,
@@ -32,6 +35,7 @@ import { alpha } from '@mui/material/styles'
 import VisibilityIcon from '@mui/icons-material/Visibility'
 import StickyNote2Icon from '@mui/icons-material/StickyNote2'
 import DownloadIcon from '@mui/icons-material/Download'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import AddIcon from '@mui/icons-material/Add'
 import TuneIcon from '@mui/icons-material/Tune'
 import { ordersApi } from '@/api/orders'
@@ -65,6 +69,14 @@ const isStatus = (value: string | null): value is OrderStatus =>
   STATUSES.includes(value as OrderStatus)
 
 const PAGE_SIZES = [25, 50, 100]
+
+const STATUS_RULES = [
+  { label: 'Steps', text: 'Pending → Processing → Shipped → Delivered. Orders only move forward.' },
+  { label: 'Cancelling', text: 'Only from Pending or Processing.' },
+  { label: 'Stock', text: 'Pending → Processing takes the items out of stock. Processing → Cancelled puts them back.' },
+  { label: 'Refused at the door', text: 'Shipped → Returned. This puts the items back unless you untick it.' },
+  { label: 'After delivery', text: 'Delivered is final. The shop takes no returns after delivery.' },
+]
 
 // Said before a one-tap move on a phone: these only go forward, so a slip of the thumb must not count
 const STEP_WARNINGS: Partial<Record<OrderStatus, string>> = {
@@ -527,12 +539,26 @@ export default function OrdersPage() {
         </>
       )}
 
-      <Typography variant="body2" color="text.secondary" sx={{ pt: isPhone ? 1 : 0 }}>
-        Orders move forward only: Pending → Processing → Shipped → Delivered, or Cancelled from
-        Pending/Processing. Pending → Processing takes the items out of stock; Processing → Cancelled
-        puts them back. A parcel refused at the door is Shipped → Returned, which puts the items back unless
-        you untick it. Delivered is final: the shop takes no returns after delivery.
-      </Typography>
+      <Accordion
+        disableGutters
+        elevation={0}
+        defaultExpanded={!isPhone}
+        sx={{ bgcolor: 'transparent', '&::before': { display: 'none' } }}
+      >
+        <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0 }}>
+          <Typography variant="body2">How order status works</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ px: 0, pt: 0 }}>
+          <Stack spacing={1.5}>
+            {STATUS_RULES.map((rule) => (
+              <div key={rule.label}>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{rule.label}</Typography>
+                <Typography variant="body2" color="text.secondary">{rule.text}</Typography>
+              </div>
+            ))}
+          </Stack>
+        </AccordionDetails>
+      </Accordion>
 
       {isPhone && can('orders.edit') && (
         <AddFab label="Add order" icon={<AddIcon />} onClick={() => navigate('/orders/new')} />
