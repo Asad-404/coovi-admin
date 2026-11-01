@@ -6,11 +6,15 @@ import type { Product } from '@/types'
 const PRODUCT_PAGE_SIZE = 50
 
 export const productsApi = {
-  // GET /products -> { success, data: [...], pagination } — every page
+  // GET /products -> { success, data: [...], pagination } — every page, published products only
   getAll: (): Promise<Product[]> => fetchAllPages<Product>('/products', PRODUCT_PAGE_SIZE),
 
+  // GET /products/manage -> the same list with drafts included (needs products.view)
+  getAllWithDrafts: (): Promise<Product[]> => fetchAllPages<Product>('/products/manage', PRODUCT_PAGE_SIZE),
+
+  // GET /products/manage/:slug -> finds a draft too (needs products.view)
   getBySlug: async (slug: string): Promise<Product> => {
-    const res = await apiClient.get(`/products/${slug}`)
+    const res = await apiClient.get(`/products/manage/${slug}`)
     return res.data.data
   },
 

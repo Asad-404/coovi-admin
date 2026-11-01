@@ -70,8 +70,9 @@ export default function ProductsPage() {
     setSearchParams(value === 'all' ? {} : { stock: value }, { replace: true })
 
   const { data: products, isLoading, isError } = useQuery({
-    queryKey: ['products'],
-    queryFn: productsApi.getAll,
+    // Its own key: the dashboard and order form share ['products'] without drafts
+    queryKey: ['products', 'with-drafts'],
+    queryFn: productsApi.getAllWithDrafts,
   })
 
   const lowStockThreshold = useLowStockThreshold()
@@ -136,6 +137,7 @@ export default function ProductsPage() {
 
   const stockChips = (product: Product) => (
     <>
+      {!product.published && <Chip size="small" color="warning" label="Draft" />}
       <Chip
         size="small"
         label={`${product.stock} in stock`}
