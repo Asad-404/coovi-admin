@@ -7,7 +7,10 @@ import {
   MAX_SHARE_IMAGE_BYTES,
   appendImageUrls,
   checkImageFile,
+  checkPhotoSize,
+  checkPublishNeeds,
   checkShareImage,
+  findPictureProblem,
   getUploadErrorMessage,
   moveImageUrlFirst,
   parseImages,
@@ -53,6 +56,68 @@ describe('checkShareImage', () => {
 
   it('rejects a file that is not an image', () => {
     expect(checkShareImage(sized(1000, 'application/pdf'), WIDE)).toMatch(/not an image/)
+  })
+})
+
+describe('checkPhotoSize', () => {
+  it('accepts an upright 3:4 photo, and one a pixel or two off', () => {
+    expect(checkPhotoSize('Photo 1', { width: 1200, height: 1600 })).toBeNull()
+    expect(checkPhotoSize('Photo 1', { width: 1201, height: 1600 })).toBeNull()
+  })
+
+  it('rejects a square or wide photo', () => {
+    expect(checkPhotoSize('Photo 2', { width: 1000, height: 1000 })).toMatch(/Photo 2 is 1000 x 1000 px.*3:4/)
+    expect(checkPhotoSize('Photo 2', { width: 1600, height: 1200 })).toMatch(/3:4/)
+  })
+
+  it('rejects a 3:4 photo that is too small', () => {
+    expect(checkPhotoSize('Photo 3', { width: 300, height: 400 })).toMatch(/too small/)
+  })
+})
+
+describe('checkPublishNeeds', () => {
+  const THREE = ['a.jpg', 'b.jpg', 'c.jpg']
+
+  it('passes with 3 different photos and a share image', () => {
+    expect(checkPublishNeeds(THREE, 'share.jpg')).toBeNull()
+  })
+
+  it('asks for more photos, and does not count one twice', () => {
+    expect(checkPublishNeeds(['a.jpg', 'b.jpg'], 'share.jpg')?.field).toBe('photos')
+    expect(checkPublishNeeds(['a.jpg', 'a.jpg', 'a.jpg'], 'share.jpg')?.field).toBe('photos')
+  })
+
+  it('asks for a share image', () => {
+    expect(checkPublishNeeds(THREE, '')?.field).toBe('shareImage')
+  })
+})
+
+describe('findPictureProblem', () => {
+  const PHOTO = { width: 1200, height: 1600 }
+  const SHARE = { width: 1200, height: 630 }
+  const sizes = (bySrc: Record<string, typeof PHOTO>) => async (url: string) => {
+    if (!bySrc[url]) throw new Error('broken')
+    return bySrc[url]
+  }
+
+  it('passes when every picture has the right shape', async () => {
+    expect(await findPictureProblem(['a'], 's', sizes({ a: PHOTO, s: SHARE }))).toBeNull()
+  })
+
+  it('names the photo with the wrong shape', async () => {
+    const problem = await findPictureProblem(['a', 'b'], 's', sizes({ a: PHOTO, b: SHARE, s: SHARE }))
+    expect(problem?.field).toBe('photos')
+    expect(problem?.message).toMatch(/^Photo 2 is 1200 x 630/)
+  })
+
+  it('reports a link that cannot be opened', async () => {
+    const problem = await findPictureProblem(['a'], 's', sizes({ s: SHARE }))
+    expect(problem?.message).toMatch(/Could not open photo 1/)
+  })
+
+  it('checks the share image shape', async () => {
+    const problem = await findPictureProblem(['a'], 's', sizes({ a: PHOTO, s: PHOTO }))
+    expect(problem?.field).toBe('shareImage')
   })
 })
 
