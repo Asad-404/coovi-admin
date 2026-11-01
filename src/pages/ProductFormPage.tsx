@@ -12,6 +12,7 @@ import {
   Button,
   Card,
   CardContent,
+  Chip,
   CircularProgress,
   FormControlLabel,
   IconButton,
@@ -171,13 +172,20 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
   const [linksOpen, setLinksOpen] = useState(false)
   const isPhone = useIsPhone()
 
+  // A new product stays a draft until someone presses Publish
+  const isPublished = product?.published ?? false
+
   const saveMutation = useMutation({
     mutationFn: (data: Partial<Product>) =>
       isEdit && product
         ? productsApi.update(product._id, data)
         : productsApi.create(data),
     onSuccess: (saved) => {
-      notify(isEdit ? `${saved.name} saved` : `${saved.name} created`)
+      if (saved.published !== isPublished) {
+        notify(`${saved.name} ${saved.published ? 'published' : 'unpublished'}`)
+      } else {
+        notify(saved.published ? `${saved.name} saved` : `${saved.name} saved as a draft`)
+      }
       queryClient.invalidateQueries({ queryKey: ['products'] })
       queryClient.invalidateQueries({ queryKey: ['product'] })
       queryClient.invalidateQueries({ queryKey: ['product-cost'] })
@@ -252,8 +260,13 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
     }
   }
 
+  // Enter in a text box and the save button keep the product as it is, so typing can never publish it
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
+    save(isPublished)
+  }
+
+  const save = (published: boolean) => {
     setError('')
 
     const images = parseImages(form.imagesText)
@@ -334,10 +347,14 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
       descriptionBn: form.descriptionBn || undefined,
       images,
       shareImage: shareImage || undefined,
+      published,
     })
   }
 
   const imagePreviews = parseImages(form.imagesText)
+  const busy = saveMutation.isPending || uploading
+  const pendingPublished = saveMutation.isPending ? saveMutation.variables?.published : undefined
+  const spinner = <CircularProgress size={20} color="inherit" />
 
   const uploadIcon = uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />
   // On a phone number boxes sit in pairs, so more of the form fits on screen
@@ -622,22 +639,71 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
         </AccordionDetails>
       </Accordion>
 
+      <Card>
+        <CardContent>
+          <Stack spacing={1}>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Typography variant="h6">Publish</Typography>
+              <Chip size="small" color={isPublished ? 'success' : 'warning'} label={isPublished ? 'Published' : 'Draft'} />
+            </Stack>
+            <Typography variant="body2" color="text.secondary">
+              {isPublished
+                ? 'Customers can see and order this product. Unpublish takes it off the shop without deleting it.'
+                : 'Customers cannot see or order this product until you publish it.'}
+            </Typography>
+          </Stack>
+        </CardContent>
+      </Card>
+
       <StickyActions error={error} onCloseError={() => setError('')}>
-        <Stack direction="row" spacing={2}>
-          <Button
-            type="submit"
-            variant="contained"
-            size="large"
-            fullWidth={isPhone}
-            disabled={saveMutation.isPending || uploading}
-            startIcon={saveMutation.isPending ? <CircularProgress size={20} color="inherit" /> : undefined}
-          >
-            {saveMutation.isPending
-              ? 'Saving…'
-              : isEdit
-                ? 'Save Changes'
-                : 'Create Product'}
-          </Button>
+        <Stack direction="row" spacing={isPhone ? 1 : 2}>
+          {isPublished ? (
+            <>
+              <Button
+                type="submit"
+                variant="contained"
+                size="large"
+                fullWidth={isPhone}
+                disabled={busy}
+                startIcon={pendingPublished === true ? spinner : undefined}
+              >
+                {pendingPublished === true ? 'Saving…' : 'Save Changes'}
+              </Button>
+              <Button
+                variant="outlined"
+                size="large"
+                fullWidth={isPhone}
+                disabled={busy}
+                startIcon={pendingPublished === false ? spinner : undefined}
+                onClick={() => save(false)}
+              >
+                {pendingPublished === false ? 'Unpublishing…' : 'Unpublish'}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                type="submit"
+                variant="outlined"
+                size="large"
+                fullWidth={isPhone}
+                disabled={busy}
+                startIcon={pendingPublished === false ? spinner : undefined}
+              >
+                {pendingPublished === false ? 'Saving…' : 'Save draft'}
+              </Button>
+              <Button
+                variant="contained"
+                size="large"
+                fullWidth={isPhone}
+                disabled={busy}
+                startIcon={pendingPublished === true ? spinner : undefined}
+                onClick={() => save(true)}
+              >
+                {pendingPublished === true ? 'Publishing…' : 'Publish'}
+              </Button>
+            </>
+          )}
           {!isPhone && (
             <Button size="large" onClick={() => navigate('/products')}>
               Cancel

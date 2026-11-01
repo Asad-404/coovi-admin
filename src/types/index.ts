@@ -37,6 +37,8 @@ export interface Product {
   // Out of stock pre-orders: allowed when on, shipping in about preorderDays
   allowPreorder?: boolean
   preorderDays?: number
+  // false = a draft: customers cannot see or order it
+  published: boolean
   // Only sent by the admin with money access; never returned by the product list
   costPrice?: number | null
   createdAt: string
