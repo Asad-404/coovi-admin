@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
   Button,
+  ButtonBase,
   Checkbox,
   Chip,
   CircularProgress,
@@ -11,6 +12,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   Paper,
   Skeleton,
@@ -28,6 +30,9 @@ import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import AddFab from '@/components/phone/AddFab'
+import PageHeader from '@/components/phone/PageHeader'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { courierPaymentsApi } from '@/api/courierPayments'
 import { getErrorMessage } from '@/api/errors'
 import RecordPaymentDialog from '@/components/RecordPaymentDialog'
@@ -56,6 +61,7 @@ export default function CourierPaymentsPage() {
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<CourierPayment | null>(null)
   const [error, setError] = useState('')
+  const isPhone = useIsPhone()
 
   const unpaid = useQuery({ queryKey: ['courier-payments', 'unpaid'], queryFn: courierPaymentsApi.unpaid })
   const payments = useQuery({ queryKey: ['courier-payments', 'list'], queryFn: courierPaymentsApi.list })
@@ -84,15 +90,14 @@ export default function CourierPaymentsPage() {
   const summary = payments.data?.summary
 
   return (
-    <Stack spacing={3}>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4">Courier payments</Typography>
+    <Stack spacing={isPhone ? 2 : 3}>
+      <PageHeader title="Courier payments">
         {canEdit && (
           <Button variant="contained" startIcon={<AddIcon />} onClick={() => setRecording(true)}>
             Record payment{selectedOrders.length ? ` (${selectedOrders.length})` : ''}
           </Button>
         )}
-      </Stack>
+      </PageHeader>
 
       <Typography variant="body2" color="text.secondary">
         The courier collects the cash on delivery and pays it to you later, minus its charges. Record each payment
@@ -101,7 +106,7 @@ export default function CourierPaymentsPage() {
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+      <Stack direction="row" useFlexGap sx={{ flexWrap: { xs: 'wrap', md: 'nowrap' }, gap: { xs: 1.5, md: 2 }, '& > :first-of-type': { flexBasis: { xs: '100%', md: 0 } } }}>
         <StatCard
           label="Delivered, not yet paid"
           value={unpaid.data ? formatPrice(unpaid.data.expectedTotal) : '…'}
@@ -118,6 +123,52 @@ export default function CourierPaymentsPage() {
         </Paper>
       ) : unpaid.isError ? (
         <Alert severity="error">Could not load unpaid orders — is the API running?</Alert>
+      ) : isPhone ? (
+        <Paper variant="outlined" sx={{ borderRadius: '12px', overflow: 'hidden' }}>
+          <Stack divider={<Divider />}>
+            {unpaidOrders.length > 0 && (
+              <ButtonBase
+                onClick={() => setSelected(allSelected ? [] : unpaidOrders.map((o) => o._id))}
+                sx={{ justifyContent: 'flex-start', gap: 0.5, pr: 1.5, minHeight: 48 }}
+              >
+                <Checkbox
+                  checked={allSelected}
+                  indeterminate={selectedOrders.length > 0 && !allSelected}
+                  tabIndex={-1}
+                  slotProps={{ input: { 'aria-label': 'Select all unpaid orders' } }}
+                />
+                <Typography variant="body2" color="text.secondary">
+                  {selectedOrders.length ? `${selectedOrders.length} selected` : 'Select all'}
+                </Typography>
+              </ButtonBase>
+            )}
+            {unpaidOrders.map((order) => (
+              <ButtonBase
+                key={order._id}
+                onClick={() => toggle(order._id)}
+                sx={{ justifyContent: 'flex-start', textAlign: 'left', gap: 0.5, pr: 1.5, py: 1 }}
+              >
+                <Checkbox
+                  checked={selected.includes(order._id)}
+                  tabIndex={-1}
+                  slotProps={{ input: { 'aria-label': `Select ${order.orderNumber}` } }}
+                />
+                <Stack sx={{ flex: 1, minWidth: 0 }}>
+                  <Typography sx={{ fontWeight: 700, letterSpacing: '0.04em' }}>{order.orderNumber}</Typography>
+                  <Typography variant="body2" color="text.secondary" noWrap>
+                    {order.customerName}, {formatDate(order.createdAt)}
+                  </Typography>
+                </Stack>
+                <Typography sx={{ fontWeight: 700, flexShrink: 0 }}>{formatPrice(order.total)}</Typography>
+              </ButtonBase>
+            ))}
+            {unpaidOrders.length === 0 && (
+              <Typography align="center" color="text.secondary" sx={{ py: 4 }}>
+                Every delivered order has been paid for.
+              </Typography>
+            )}
+          </Stack>
+        </Paper>
       ) : (
         <TableContainer component={Paper}>
           <Table sx={{ minWidth: 600 }}>
@@ -185,6 +236,75 @@ export default function CourierPaymentsPage() {
               include all of them.
             </Typography>
           )}
+          {isPhone ? (
+            <Stack spacing={1.5}>
+              {payments.data?.payments.map((payment) => {
+                const open = expandedId === payment._id
+                return (
+                  <Paper key={payment._id} variant="outlined" sx={{ borderRadius: '12px', overflow: 'hidden' }}>
+                    <ButtonBase
+                      onClick={() => setExpandedId(open ? null : payment._id)}
+                      aria-expanded={open}
+                      sx={{ display: 'block', width: '100%', textAlign: 'left', p: 1.5 }}
+                    >
+                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <Typography sx={{ fontWeight: 500 }}>{formatDate(payment.paidAt)}</Typography>
+                        <Typography sx={{ fontWeight: 700 }}>{formatPrice(payment.amountReceived)}</Typography>
+                      </Stack>
+                      <Typography variant="body2" color="text.secondary">
+                        {payment.lines.length} order{payment.lines.length === 1 ? '' : 's'}, charges {formatPrice(payment.chargeTotal)}
+                      </Typography>
+                      {(payment.reference || payment.method) && (
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {[payment.reference, payment.courier, payment.method].filter(Boolean).join(', ')}
+                        </Typography>
+                      )}
+                      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+                        {payment.difference !== 0 ? (
+                          <Chip
+                            size="small"
+                            color={payment.difference < 0 ? 'error' : 'warning'}
+                            label={`${payment.difference < 0 ? 'Short' : 'Over'} ${formatPrice(Math.abs(payment.difference))}`}
+                          />
+                        ) : <span />}
+                        {open ? <ExpandLessIcon color="action" /> : <ExpandMoreIcon color="action" />}
+                      </Stack>
+                    </ButtonBase>
+                    <Collapse in={open} unmountOnExit>
+                      <Stack divider={<Divider />} sx={{ px: 1.5 }}>
+                        {payment.lines.map((line) => (
+                          <Stack key={line.order} direction="row" spacing={1} sx={{ justifyContent: 'space-between', py: 1 }}>
+                            <div>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>{line.orderNumber}</Typography>
+                              <Typography variant="body2" color="text.secondary">
+                                Collected {formatPrice(line.collected)}, charge {formatPrice(line.charge)}
+                              </Typography>
+                            </div>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatPrice(line.net)}</Typography>
+                          </Stack>
+                        ))}
+                      </Stack>
+                      {(payment.notes || payment.recordedBy) && (
+                        <Typography variant="body2" color="text.secondary" sx={{ px: 1.5, pb: 1 }}>
+                          {[payment.notes, payment.recordedBy && `Recorded by ${payment.recordedBy}`].filter(Boolean).join('. ')}
+                        </Typography>
+                      )}
+                      {canEdit && (
+                        <Button color="error" startIcon={<DeleteIcon />} onClick={() => setDeleteTarget(payment)} sx={{ m: 0.5 }}>
+                          Delete payment
+                        </Button>
+                      )}
+                    </Collapse>
+                  </Paper>
+                )
+              })}
+              {payments.data?.payments.length === 0 && (
+                <Typography align="center" color="text.secondary" sx={{ py: 3 }}>
+                  No courier payments recorded yet.
+                </Typography>
+              )}
+            </Stack>
+          ) : (
           <TableContainer component={Paper}>
             <Table sx={{ minWidth: 800 }}>
               <TableHead>
@@ -296,7 +416,16 @@ export default function CourierPaymentsPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          )}
         </>
+      )}
+
+      {isPhone && canEdit && (
+        <AddFab
+          label={`Record${selectedOrders.length ? ` (${selectedOrders.length})` : ''}`}
+          icon={<AddIcon />}
+          onClick={() => setRecording(true)}
+        />
       )}
 
       {recording && (

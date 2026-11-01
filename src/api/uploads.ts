@@ -73,6 +73,23 @@ export const readImageSize = (file: File): Promise<ImageSize> =>
 export const appendImageUrls = (text: string, urls: string[]): string =>
   [text.trimEnd(), ...urls].filter(Boolean).join('\n')
 
+export const parseImages = (text: string): string[] =>
+  text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+export const removeImageUrl = (text: string, index: number): string =>
+  parseImages(text)
+    .filter((_, i) => i !== index)
+    .join('\n')
+
+// The first photo is the product's thumbnail
+export const moveImageUrlFirst = (text: string, index: number): string => {
+  const images = parseImages(text)
+  return [images[index], ...images.filter((_, i) => i !== index)].join('\n')
+}
+
 export const uploadsApi = {
   // POST /uploads/signature -> { success, data: UploadSignature } — valid for about an hour
   getSignature: async (): Promise<UploadSignature> => {

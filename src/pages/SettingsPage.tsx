@@ -15,6 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import PageHeader from '@/components/phone/PageHeader'
 import { getErrorMessage } from '@/api/errors'
 import { settingsApi } from '@/api/settings'
 import type { SettingsUpdate } from '@/api/settings'
@@ -225,7 +226,7 @@ export default function SettingsPage() {
 
   return (
     <Stack spacing={3} sx={{ maxWidth: 720 }}>
-      <Typography variant="h4">Settings</Typography>
+      <PageHeader title="Settings" />
 
       {isError && <Alert severity="error">Could not load the settings. The API may be down.</Alert>}
 

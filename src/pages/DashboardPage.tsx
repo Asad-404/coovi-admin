@@ -3,7 +3,9 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import {
   Alert,
+  Box,
   Button,
+  ButtonBase,
   Card,
   CardActionArea,
   CardContent,
@@ -21,10 +23,15 @@ import {
   Typography,
 } from '@mui/material'
 import type { ReactElement, ReactNode } from 'react'
+import type { DashboardStats } from '@/types'
 import { authApi } from '@/api/auth'
 import { productsApi } from '@/api/products'
 import { statsApi } from '@/api/stats'
 import RevenueChart from '@/components/RevenueChart'
+import ChipRow from '@/components/phone/ChipRow'
+import PageHeader from '@/components/phone/PageHeader'
+import { useIsPhone } from '@/hooks/useIsPhone'
+import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import { useLowStockThreshold } from '@/api/settings'
 import {
   RANGE_PRESETS,
@@ -51,12 +58,13 @@ interface StatTileProps {
 }
 
 function StatTile({ label, loading, value, hint, onClick }: StatTileProps) {
+  const isPhone = useIsPhone()
   const content = (
-    <CardContent sx={{ p: 3 }}>
+    <CardContent sx={{ p: isPhone ? 1.5 : 3, '&:last-child': { pb: isPhone ? 1.5 : 3 } }}>
       <Typography variant="body2" color="text.secondary" gutterBottom>
         {label}
       </Typography>
-      {loading ? <Skeleton variant="text" width={100} height={42} /> : <Typography variant="h4">{value}</Typography>}
+      {loading ? <Skeleton variant="text" width={100} height={42} /> : <Typography variant={isPhone ? 'h5' : 'h4'}>{value}</Typography>}
       {hint && (
         <Typography variant="caption" color="text.secondary">
           {hint}
@@ -70,12 +78,13 @@ function StatTile({ label, loading, value, hint, onClick }: StatTileProps) {
 // One row of tiles; each tile takes an equal share on wide screens
 function TileRow({ title, children }: { title: string; children: ReactElement[] }) {
   const md = 12 / Math.max(Math.min(children.length, 4), 1)
+  const isPhone = useIsPhone()
   return (
     <Stack spacing={1}>
       <Typography variant="h6">{title}</Typography>
-      <Grid container spacing={3}>
+      <Grid container spacing={isPhone ? 1.5 : 3}>
         {children.map((tile) => (
-          <Grid key={tile.key} size={{ xs: 12, sm: 6, md }}>
+          <Grid key={tile.key} size={{ xs: 6, md }}>
             {tile}
           </Grid>
         ))}
@@ -84,8 +93,56 @@ function TileRow({ title, children }: { title: string; children: ReactElement[] 
   )
 }
 
+// The phone's home screen opens on the day's work, in the order an order moves through it.
+// Joined to the top bar, and each step opens its list.
+function WorkQueue({ pipeline }: { pipeline?: DashboardStats['pipeline'] }) {
+  const navigate = useNavigate()
+  const steps = [
+    { label: 'To confirm', count: pipeline?.toConfirm, status: 'Pending' },
+    { label: 'To ship', count: pipeline?.toShip, status: 'Processing' },
+    { label: 'On the way', count: pipeline?.onTheWay, status: 'Shipped' },
+  ]
+  return (
+    <Box sx={{ mx: -2, mt: -2, px: 1, pb: 2, bgcolor: 'primary.main', color: 'primary.contrastText' }}>
+      <Stack direction="row" sx={{ alignItems: 'stretch' }}>
+        {steps.map((step, index) => (
+          <Stack key={step.label} direction="row" sx={{ flex: 1, alignItems: 'center', minWidth: 0 }}>
+            <ButtonBase
+              onClick={() => navigate(`/orders?status=${step.status}`)}
+              sx={{ flex: 1, display: 'block', textAlign: 'left', p: 1, borderRadius: 2, minWidth: 0 }}
+            >
+              <Typography
+                component="div"
+                sx={{
+                  fontSize: '2.75rem',
+                  lineHeight: 1.15,
+                  fontWeight: 700,
+                  // The first waiting step is what to do right now
+                  color: index === 0 && step.count ? 'secondary.main' : 'inherit',
+                }}
+              >
+                {step.count ?? <Skeleton width={40} sx={{ bgcolor: 'rgba(255,255,255,0.2)' }} />}
+              </Typography>
+              <Typography variant="body2" noWrap>{step.label}</Typography>
+            </ButtonBase>
+            {index < steps.length - 1 && <ChevronRightIcon sx={{ opacity: 0.5, flexShrink: 0 }} aria-hidden />}
+          </Stack>
+        ))}
+      </Stack>
+      {Boolean(pipeline?.preordersWaiting) && (
+        <ButtonBase onClick={() => navigate('/orders?status=Processing')} sx={{ px: 1, minHeight: 36 }}>
+          <Typography variant="body2" sx={{ opacity: 0.85 }}>
+            {pipeline?.preordersWaiting} pre-order{pipeline?.preordersWaiting === 1 ? '' : 's'} waiting for a saree
+          </Typography>
+        </ButtonBase>
+      )}
+    </Box>
+  )
+}
+
 export default function DashboardPage() {
   const navigate = useNavigate()
+  const isPhone = useIsPhone()
 
   // Each part shows only with its permission: money needs money.view
   const { can } = useAccess()
@@ -140,31 +197,36 @@ export default function DashboardPage() {
     range.from === range.to ? range.from : `${range.from} to ${range.to}`
 
   return (
-    <Stack spacing={3}>
-      <Typography variant="h4">Dashboard</Typography>
+    <Stack spacing={isPhone ? 2 : 3}>
+      <PageHeader title="Dashboard" />
 
-      {/* Welcome Card */}
-      <Card>
-        <CardContent>
-          {adminLoading ? (
-            <Skeleton variant="text" width={220} height={32} />
-          ) : (
-            <Stack spacing={2}>
-              <Typography variant="h6">
-                Welcome back{admin ? `, ${admin.name}` : ''} 👋
-              </Typography>
-              <Stack direction="row" spacing={1}>
-                <Chip label={admin?.email ?? ''} />
-                <Chip label={admin ? `${roleLabel(admin.role)}${admin.customized ? ' (custom)' : ''}` : ''} color="primary" />
+      {/* Welcome Card: a phone shows who is signed in under More, and opens on the work */}
+      {!(isPhone && canSeeOrders) && (
+        <Card>
+          <CardContent>
+            {adminLoading ? (
+              <Skeleton variant="text" width={220} height={32} />
+            ) : (
+              <Stack spacing={2}>
+                <Typography variant="h6">
+                  Welcome back{admin ? `, ${admin.name}` : ''} 👋
+                </Typography>
+                <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
+                  <Chip label={admin?.email ?? ''} />
+                  <Chip label={admin ? `${roleLabel(admin.role)}${admin.customized ? ' (custom)' : ''}` : ''} color="primary" />
+                </Stack>
               </Stack>
-            </Stack>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {canSeeOrders && (
         <>
           {/* What needs doing now, whenever the order was placed */}
+          {isPhone ? (
+            <WorkQueue pipeline={stats?.pipeline} />
+          ) : (
           <TileRow title="Needs doing now">
             {[
               <StatTile key="To confirm"
@@ -197,6 +259,7 @@ export default function DashboardPage() {
               />,
             ]}
           </TileRow>
+          )}
 
           {/* Date range for everything below */}
           <Card>
@@ -208,6 +271,17 @@ export default function DashboardPage() {
                     Days are in Bangladesh time. Cancelled and refused orders never count as money.
                   </Typography>
                 </Stack>
+                {isPhone ? (
+                  <ChipRow
+                    label="Date range"
+                    value={preset}
+                    onChange={(value) => {
+                      if (value === 'custom') setCustom(range)
+                      setPreset(value)
+                    }}
+                    options={RANGE_PRESETS.map((r) => ({ value: r.key, label: r.label }))}
+                  />
+                ) : (
                 <ToggleButtonGroup
                   size="small"
                   exclusive
@@ -227,6 +301,7 @@ export default function DashboardPage() {
                     </ToggleButton>
                   ))}
                 </ToggleButtonGroup>
+                )}
               </Stack>
               {preset === 'custom' && (
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 2 }}>
@@ -389,7 +464,7 @@ export default function DashboardPage() {
                 Orders by status
               </Typography>
               {loading ? (
-                <Skeleton variant="text" width={400} height={40} />
+                <Skeleton variant="text" width={400} height={40} sx={{ maxWidth: '100%' }} />
               ) : (
                 <Stack direction="row" sx={{ flexWrap: 'wrap', mt: 2, gap: 1 }}>
                   {STATUSES.map((status) => (
@@ -420,7 +495,7 @@ export default function DashboardPage() {
               label="Low stock"
               loading={productsLoading}
               value={
-                <Typography component="span" variant="h4" color={lowStockList.length > 0 ? 'error' : 'text.primary'}>
+                <Typography component="span" variant="inherit" color={lowStockList.length > 0 ? 'error' : 'text.primary'}>
                   {lowStockList.length}
                 </Typography>
               }

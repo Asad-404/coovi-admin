@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
+  Box,
   Button,
   CircularProgress,
   Dialog,
@@ -10,12 +11,8 @@ import {
   DialogTitle,
   IconButton,
   MenuItem,
+  Paper,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
   Typography,
 } from '@mui/material'
@@ -23,6 +20,7 @@ import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { courierPaymentsApi } from '@/api/courierPayments'
 import { getErrorMessage } from '@/api/errors'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useNotify } from '@/notify/context'
 import { formatPrice } from '@/utils/format'
 import { PAYMENT_METHODS, type PaymentMethod, type UnpaidOrder } from '@/types'
@@ -48,6 +46,7 @@ export default function RecordPaymentDialog({ orders, onClose }: Props) {
   const notify = useNotify()
   const [draft, setDraft] = useState<PaymentDraft>(() => emptyDraft(orders))
   const [error, setError] = useState('')
+  const isPhone = useIsPhone()
 
   const mutation = useMutation({
     mutationFn: courierPaymentsApi.create,
@@ -78,7 +77,7 @@ export default function RecordPaymentDialog({ orders, onClose }: Props) {
   }
 
   return (
-    <Dialog open onClose={() => !mutation.isPending && onClose()} maxWidth="md" fullWidth>
+    <Dialog open onClose={() => !mutation.isPending && onClose()} maxWidth="md" fullWidth fullScreen={isPhone}>
       <DialogTitle>Record courier payment</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
@@ -122,78 +121,69 @@ export default function RecordPaymentDialog({ orders, onClose }: Props) {
             />
           </Stack>
 
-          <Table size="small">
-            <TableHead>
-              <TableRow>
-                <TableCell>Order #</TableCell>
-                <TableCell>Cash collected</TableCell>
-                <TableCell>Courier charge</TableCell>
-                <TableCell align="right">Net</TableCell>
-                <TableCell />
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {draft.lines.map((line, index) => {
-                const collected = parseAmount(line.collected)
-                const short = line.orderTotal !== undefined && collected !== null && collected !== line.orderTotal
-                return (
-                  <TableRow key={index}>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        placeholder="e.g. K7M3QX"
-                        value={line.orderNumber}
-                        onChange={(e) => setLine(index, { orderNumber: e.target.value, orderTotal: undefined })}
-                        slotProps={{ htmlInput: { 'aria-label': `Order number, row ${index + 1}` } }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        value={line.collected}
-                        onChange={(e) => setLine(index, { collected: e.target.value })}
-                        helperText={short ? `Order total is ${formatPrice(line.orderTotal!)}` : undefined}
-                        color={short ? 'warning' : undefined}
-                        slotProps={{ htmlInput: { inputMode: 'decimal', 'aria-label': `Cash collected, row ${index + 1}` } }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <TextField
-                        size="small"
-                        placeholder="0"
-                        value={line.charge}
-                        onChange={(e) => setLine(index, { charge: e.target.value })}
-                        slotProps={{ htmlInput: { inputMode: 'decimal', 'aria-label': `Courier charge, row ${index + 1}` } }}
-                      />
-                    </TableCell>
-                    <TableCell align="right">
-                      {formatPrice((parseAmount(line.collected) ?? 0) - (parseAmount(line.charge) ?? 0))}
-                    </TableCell>
-                    <TableCell>
-                      <IconButton
-                        size="small"
-                        aria-label={`Remove row ${index + 1}`}
-                        onClick={() => set({ lines: draft.lines.filter((_, i) => i !== index) })}
-                      >
-                        <DeleteIcon fontSize="small" />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-              <TableRow>
-                <TableCell colSpan={5}>
-                  <Button
-                    size="small"
-                    startIcon={<AddIcon />}
-                    onClick={() => set({ lines: [...draft.lines, { orderNumber: '', collected: '0', charge: '' }] })}
+          {/* One row per parcel on a wide screen; on a phone each parcel is its own small block */}
+          <Stack spacing={1}>
+            {draft.lines.map((line, index) => {
+              const collected = parseAmount(line.collected)
+              const short = line.orderTotal !== undefined && collected !== null && collected !== line.orderTotal
+              return (
+                <Paper key={index} variant="outlined" sx={{ p: 1.5 }}>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 1.5,
+                      alignItems: 'start',
+                      gridTemplateColumns: { xs: '1fr 1fr', md: '1.2fr 1fr 1fr auto auto' },
+                    }}
                   >
-                    Add order by number
-                  </Button>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
+                    <TextField
+                      label="Order number"
+                      size="small"
+                      placeholder="e.g. K7M3QX"
+                      value={line.orderNumber}
+                      onChange={(e) => setLine(index, { orderNumber: e.target.value, orderTotal: undefined })}
+                      sx={{ gridColumn: { xs: '1 / -1', md: 'auto' } }}
+                    />
+                    <TextField
+                      label="Cash collected"
+                      size="small"
+                      value={line.collected}
+                      onChange={(e) => setLine(index, { collected: e.target.value })}
+                      helperText={short ? `Order total is ${formatPrice(line.orderTotal!)}` : undefined}
+                      color={short ? 'warning' : undefined}
+                      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+                    />
+                    <TextField
+                      label="Courier charge"
+                      size="small"
+                      placeholder="0"
+                      value={line.charge}
+                      onChange={(e) => setLine(index, { charge: e.target.value })}
+                      slotProps={{ htmlInput: { inputMode: 'decimal' } }}
+                    />
+                    <Typography sx={{ alignSelf: 'center', fontWeight: 500 }}>
+                      Net {formatPrice((parseAmount(line.collected) ?? 0) - (parseAmount(line.charge) ?? 0))}
+                    </Typography>
+                    <IconButton
+                      aria-label={`Remove row ${index + 1}`}
+                      onClick={() => set({ lines: draft.lines.filter((_, i) => i !== index) })}
+                      sx={{ justifySelf: 'end' }}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                </Paper>
+              )
+            })}
+            <div>
+              <Button
+                startIcon={<AddIcon />}
+                onClick={() => set({ lines: [...draft.lines, { orderNumber: '', collected: '0', charge: '' }] })}
+              >
+                Add order by number
+              </Button>
+            </div>
+          </Stack>
 
           <Stack spacing={0.5} sx={{ alignItems: 'flex-end' }}>
             <Typography variant="body2">Cash collected: {formatPrice(totals.collected)}</Typography>

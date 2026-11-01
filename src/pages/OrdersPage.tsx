@@ -1,11 +1,16 @@
 import { useState } from 'react'
-import { Link as RouterLink, useSearchParams } from 'react-router-dom'
+import { Link as RouterLink, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Alert,
+  Badge,
   Button,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   IconButton,
   MenuItem,
   Paper,
@@ -28,6 +33,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility'
 import StickyNote2Icon from '@mui/icons-material/StickyNote2'
 import DownloadIcon from '@mui/icons-material/Download'
 import AddIcon from '@mui/icons-material/Add'
+import TuneIcon from '@mui/icons-material/Tune'
 import { ordersApi } from '@/api/orders'
 import { useOrderPage } from '@/hooks/useOrders'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
@@ -36,13 +42,20 @@ import { useNotify } from '@/notify/context'
 import { formatDate, formatPrice } from '@/utils/format'
 import type { DeliveryArea, Order, OrderSource, OrderStatus, StatusUpdate } from '@/types'
 import OrderDetailModal from '@/components/OrderDetailModal'
+import AddFab from '@/components/phone/AddFab'
+import BottomSheet from '@/components/phone/BottomSheet'
+import ChipRow from '@/components/phone/ChipRow'
+import OrderCard from '@/components/phone/OrderCard'
+import PageHeader from '@/components/phone/PageHeader'
+import Pager from '@/components/phone/Pager'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import StatusChangeDialog from '@/components/StatusChangeDialog'
 import CallWarningDialog from '@/components/CallWarningDialog'
 import { downloadCsv, ordersToCsv } from '@/utils/orderExport'
 import { useAccess } from '@/hooks/useMe'
 import { toOrderQuery } from '@/utils/orderFilters'
 import { DELIVERY_AREA_LABELS } from '@/utils/deliveryArea'
-import { NEXT_STATUSES, STATUSES, statusColor } from '@/utils/orderStatus'
+import { NEXT_STATUSES, STATUSES, STEP_LABELS, statusColor } from '@/utils/orderStatus'
 import { hasPreorder } from '@/utils/preorder'
 import { awaitingCall, needsCallWarning } from '@/utils/callConfirm'
 import { blockLabel } from '@/utils/customers'
@@ -53,9 +66,18 @@ const isStatus = (value: string | null): value is OrderStatus =>
 
 const PAGE_SIZES = [25, 50, 100]
 
+// Said before a one-tap move on a phone: these only go forward, so a slip of the thumb must not count
+const STEP_WARNINGS: Partial<Record<OrderStatus, string>> = {
+  Processing: 'The items come out of stock and the order moves to Processing.',
+  Shipped: "The parcel is with the courier. This can't be undone.",
+  Delivered: "The customer has the parcel and paid. This can't be undone.",
+}
+
 export default function OrdersPage() {
   const queryClient = useQueryClient()
   const notify = useNotify()
+  const navigate = useNavigate()
+  const isPhone = useIsPhone()
   const { can } = useAccess()
   const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState('')
@@ -66,6 +88,9 @@ export default function OrdersPage() {
   const [pendingChange, setPendingChange] = useState<{ order: Order; status: 'Cancelled' | 'Returned' } | null>(null)
   // Moving an order nobody confirmed by call to Processing asks first
   const [uncalledOrder, setUncalledOrder] = useState<Order | null>(null)
+  // A one-tap move waiting for its yes
+  const [confirmMove, setConfirmMove] = useState<{ order: Order; status: OrderStatus } | null>(null)
+  const [filtersOpen, setFiltersOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
@@ -109,6 +134,7 @@ export default function OrdersPage() {
       setError('')
       setPendingChange(null)
       setUncalledOrder(null)
+      setConfirmMove(null)
       notify(`${order.orderNumber} is now ${order.status}`)
       queryClient.invalidateQueries({ queryKey: ['orders'] })
       queryClient.invalidateQueries({ queryKey: ['products'] })
@@ -116,7 +142,10 @@ export default function OrdersPage() {
     onError: (err) => {
       setPendingChange(null)
       setUncalledOrder(null)
-      setError(getErrorMessage(err, 'Status update failed'))
+      setConfirmMove(null)
+      // A phone may be scrolled far from the top of the page, where the error box sits
+      if (isPhone) notify(getErrorMessage(err, 'Status update failed'), 'error')
+      else setError(getErrorMessage(err, 'Status update failed'))
       // A 409 usually means the order changed elsewhere — show its current state
       queryClient.invalidateQueries({ queryKey: ['orders'] })
     },
@@ -141,6 +170,12 @@ export default function OrdersPage() {
     statusMutation.mutate({ id: order._id, change: { status } })
   }
 
+  // The main button on a card or in the order window: same checks, plus a yes for any other move
+  const askMove = (order: Order, status: OrderStatus) => {
+    if (status === 'Cancelled' || status === 'Returned' || needsCallWarning(order, status)) handleChange(order, status)
+    else setConfirmMove({ order, status })
+  }
+
   // The file has every order matching the filters, not just this page
   const exportCsv = async () => {
     setExporting(true)
@@ -158,113 +193,162 @@ export default function OrdersPage() {
     searchTerm || fromDate || toDate || statusFilter !== 'All' || areaFilter !== 'All' || sourceFilter !== 'All',
   )
 
+  // Needs orders.export: a file of every customer's name, phone and address
+  const exportButton = can('orders.export') && (
+    <Button
+      variant="outlined"
+      startIcon={exporting ? <CircularProgress size={18} /> : <DownloadIcon />}
+      disabled={total === 0 || exporting}
+      onClick={exportCsv}
+    >
+      {exporting ? 'Exporting…' : 'Export CSV'}
+    </Button>
+  )
+
+  const clearFilters = () => {
+    setSearchTerm('')
+    setFromDate('')
+    setToDate('')
+    setAreaFilter('All')
+    setStatusFilter('All')
+    setSourceFilter('All')
+  }
+
+  const areaSelect = (
+    <Select
+      value={areaFilter}
+      onChange={(e) => setAreaFilter(e.target.value as DeliveryArea | 'All')}
+      size="small"
+      sx={{ minWidth: 150 }}
+      inputProps={{ 'aria-label': 'Delivery area' }}
+    >
+      <MenuItem value="All">All areas</MenuItem>
+      {(Object.keys(DELIVERY_AREA_LABELS) as DeliveryArea[]).map((area) => (
+        <MenuItem key={area} value={area}>
+          {DELIVERY_AREA_LABELS[area]}
+        </MenuItem>
+      ))}
+    </Select>
+  )
+
+  const sourceSelect = (
+    <Select
+      value={sourceFilter}
+      onChange={(e) => setSourceFilter(e.target.value as OrderSource | 'All')}
+      size="small"
+      sx={{ minWidth: 150 }}
+      inputProps={{ 'aria-label': 'Source' }}
+    >
+      <MenuItem value="All">All sources</MenuItem>
+      {ORDER_SOURCES.map((source) => (
+        <MenuItem key={source} value={source}>
+          {SOURCE_LABELS[source]}
+        </MenuItem>
+      ))}
+    </Select>
+  )
+
+  const dateFields = (
+    <>
+      <TextField
+        label="From"
+        type="date"
+        size="small"
+        value={fromDate}
+        onChange={(e) => setFromDate(e.target.value)}
+        slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: toDate || undefined } }}
+      />
+      <TextField
+        label="To"
+        type="date"
+        size="small"
+        value={toDate}
+        onChange={(e) => setToDate(e.target.value)}
+        slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: fromDate || undefined } }}
+      />
+    </>
+  )
+
+  const sheetFilterCount = [areaFilter !== 'All', sourceFilter !== 'All', Boolean(fromDate), Boolean(toDate)].filter(Boolean).length
+
   return (
-    <Stack spacing={3}>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4">Orders</Typography>
-        <Stack direction="row" spacing={1}>
-          {can('orders.edit') && (
-            <Button variant="contained" startIcon={<AddIcon />} component={RouterLink} to="/orders/new">
-              Add order
-            </Button>
-          )}
-          {/* Needs orders.export: a file of every customer's name, phone and address */}
-          {can('orders.export') && (
-            <Button
-              variant="outlined"
-              startIcon={exporting ? <CircularProgress size={18} /> : <DownloadIcon />}
-              disabled={total === 0 || exporting}
-              onClick={exportCsv}
-            >
-              {exporting ? 'Exporting…' : 'Export CSV'}
-            </Button>
-          )}
-        </Stack>
-      </Stack>
+    <Stack spacing={isPhone ? 1 : 3}>
+      <PageHeader title="Orders">
+        {can('orders.edit') && (
+          <Button variant="contained" startIcon={<AddIcon />} component={RouterLink} to="/orders/new">
+            Add order
+          </Button>
+        )}
+        {exportButton}
+      </PageHeader>
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
       {/* Filters */}
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-        <TextField
-          placeholder="Search by order #, name, or phone..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="small"
-          sx={{ flex: 1 }}
-        />
-        <Select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'All')}
-          size="small"
-          sx={{ minWidth: 150 }}
-        >
-          <MenuItem value="All">All Status</MenuItem>
-          {STATUSES.map((status) => (
-            <MenuItem key={status} value={status}>
-              {status}
-            </MenuItem>
-          ))}
-        </Select>
-        <Select
-          value={areaFilter}
-          onChange={(e) => setAreaFilter(e.target.value as DeliveryArea | 'All')}
-          size="small"
-          sx={{ minWidth: 150 }}
-          inputProps={{ 'aria-label': 'Delivery area' }}
-        >
-          <MenuItem value="All">All areas</MenuItem>
-          {(Object.keys(DELIVERY_AREA_LABELS) as DeliveryArea[]).map((area) => (
-            <MenuItem key={area} value={area}>
-              {DELIVERY_AREA_LABELS[area]}
-            </MenuItem>
-          ))}
-        </Select>
-        <Select
-          value={sourceFilter}
-          onChange={(e) => setSourceFilter(e.target.value as OrderSource | 'All')}
-          size="small"
-          sx={{ minWidth: 150 }}
-          inputProps={{ 'aria-label': 'Source' }}
-        >
-          <MenuItem value="All">All sources</MenuItem>
-          {ORDER_SOURCES.map((source) => (
-            <MenuItem key={source} value={source}>
-              {SOURCE_LABELS[source]}
-            </MenuItem>
-          ))}
-        </Select>
-        <TextField
-          label="From"
-          type="date"
-          size="small"
-          value={fromDate}
-          onChange={(e) => setFromDate(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true }, htmlInput: { max: toDate || undefined } }}
-        />
-        <TextField
-          label="To"
-          type="date"
-          size="small"
-          value={toDate}
-          onChange={(e) => setToDate(e.target.value)}
-          slotProps={{ inputLabel: { shrink: true }, htmlInput: { min: fromDate || undefined } }}
-        />
-        {hasFilters && (
-          <Button
-            onClick={() => {
-              setSearchTerm('')
-              setFromDate('')
-              setToDate('')
-              setAreaFilter('All')
-              setStatusFilter('All')
-              setSourceFilter('All')
-            }}
+      {isPhone ? (
+        <>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <TextField
+              placeholder="Order number, name or phone"
+              aria-label="Search orders"
+              type="search"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              size="small"
+              sx={{ flex: 1 }}
+            />
+            <IconButton onClick={() => setFiltersOpen(true)} aria-label="More filters and export">
+              <Badge badgeContent={sheetFilterCount} color="secondary">
+                <TuneIcon />
+              </Badge>
+            </IconButton>
+          </Stack>
+          <ChipRow
+            label="Status"
+            sticky
+            value={statusFilter}
+            onChange={setStatusFilter}
+            options={[{ value: 'All', label: 'All' }, ...STATUSES.map((status) => ({ value: status, label: status }))]}
+          />
+          <BottomSheet open={filtersOpen} title="Filter orders" onClose={() => setFiltersOpen(false)}>
+            {areaSelect}
+            {sourceSelect}
+            {dateFields}
+            {exportButton}
+            <Stack direction="row" spacing={1}>
+              <Button sx={{ flex: 1 }} disabled={!hasFilters} onClick={clearFilters}>Clear all</Button>
+              <Button sx={{ flex: 1 }} variant="contained" onClick={() => setFiltersOpen(false)}>Show orders</Button>
+            </Stack>
+          </BottomSheet>
+        </>
+      ) : (
+        <Stack direction="row" spacing={2} sx={{ flexWrap: 'wrap' }}>
+          <TextField
+            placeholder="Search by order #, name, or phone..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ flex: 1, minWidth: 280 }}
+          />
+          <Select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as OrderStatus | 'All')}
+            size="small"
+            sx={{ minWidth: 150 }}
           >
-            Clear
-          </Button>
-        )}
-      </Stack>
+            <MenuItem value="All">All Status</MenuItem>
+            {STATUSES.map((status) => (
+              <MenuItem key={status} value={status}>
+                {status}
+              </MenuItem>
+            ))}
+          </Select>
+          {areaSelect}
+          {sourceSelect}
+          {dateFields}
+          {hasFilters && <Button onClick={clearFilters}>Clear</Button>}
+        </Stack>
+      )}
 
       {isLoading ? (
         <Paper sx={{ p: 2 }}>
@@ -287,6 +371,26 @@ export default function OrdersPage() {
             {isFetching && <CircularProgress size={14} aria-label="Loading" />}
           </Stack>
 
+          {isPhone ? (
+            <Stack spacing={1.5}>
+              {orders?.map((order) => (
+                <OrderCard
+                  key={order._id}
+                  order={order}
+                  canEdit={can('orders.edit')}
+                  saving={savingId === order._id}
+                  onOpen={setSelected}
+                  onMove={askMove}
+                />
+              ))}
+              {orders?.length === 0 && (
+                <Typography align="center" color="text.secondary" sx={{ py: 4 }}>
+                  {hasFilters ? 'No orders match your filters.' : 'No orders yet. Tap Add order to enter one.'}
+                </Typography>
+              )}
+              <Pager page={page} pageSize={pageSize} total={total} onChange={(next) => setPaging({ queryKey, page: next })} />
+            </Stack>
+          ) : (
           <TableContainer component={Paper}>
             <Table sx={{ minWidth: 1000 }}>
               <TableHead>
@@ -324,7 +428,7 @@ export default function OrdersPage() {
                           )}
                         </Stack>
                       </TableCell>
-                      <TableCell>{formatDate(order.createdAt)}</TableCell>
+                      <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(order.createdAt)}</TableCell>
                       <TableCell>
                         <Tooltip title={order.address}>
                           <Stack>
@@ -419,15 +523,20 @@ export default function OrdersPage() {
               }}
             />
           </TableContainer>
+          )}
         </>
       )}
 
-      <Typography variant="body2" color="text.secondary">
+      <Typography variant="body2" color="text.secondary" sx={{ pt: isPhone ? 1 : 0 }}>
         Orders move forward only: Pending → Processing → Shipped → Delivered, or Cancelled from
         Pending/Processing. Pending → Processing takes the items out of stock; Processing → Cancelled
         puts them back. A parcel refused at the door is Shipped → Returned, which puts the items back unless
         you untick it. Delivered is final: the shop takes no returns after delivery.
       </Typography>
+
+      {isPhone && can('orders.edit') && (
+        <AddFab label="Add order" icon={<AddIcon />} onClick={() => navigate('/orders/new')} />
+      )}
 
       {/* Cancel or mark returned: asks for the reason and restock */}
       <CallWarningDialog
@@ -454,7 +563,35 @@ export default function OrdersPage() {
         order={selectedOrder}
         open={Boolean(selectedOrder)}
         onClose={() => setSelected(null)}
+        saving={statusMutation.isPending}
+        onMove={askMove}
       />
+
+      <Dialog open={confirmMove !== null} onClose={() => !statusMutation.isPending && setConfirmMove(null)} maxWidth="xs" fullWidth>
+        {confirmMove && (
+          <>
+            <DialogTitle>
+              {STEP_LABELS[confirmMove.status as keyof typeof STEP_LABELS]}: {confirmMove.order.orderNumber}?
+            </DialogTitle>
+            <DialogContent>
+              <Typography>
+                {confirmMove.order.customerName}, {formatPrice(confirmMove.order.total)}. {STEP_WARNINGS[confirmMove.status]}
+              </Typography>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setConfirmMove(null)} disabled={statusMutation.isPending}>Go back</Button>
+              <Button
+                variant="contained"
+                disabled={statusMutation.isPending}
+                startIcon={statusMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
+                onClick={() => statusMutation.mutate({ id: confirmMove.order._id, change: { status: confirmMove.status } })}
+              >
+                {STEP_LABELS[confirmMove.status as keyof typeof STEP_LABELS]}
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
     </Stack>
   )
 }

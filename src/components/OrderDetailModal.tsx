@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  IconButton,
   Stack,
   Table,
   TableBody,
@@ -16,13 +17,16 @@ import {
 import { useState } from 'react'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
+import CloseIcon from '@mui/icons-material/Close'
 import OrderDetailsForm from '@/components/OrderDetailsForm'
 import CourierSection from '@/components/CourierSection'
 import OrderTimeline from '@/components/OrderTimeline'
 import CustomerSummary from '@/components/CustomerSummary'
 import CallConfirmedToggle from '@/components/CallConfirmedToggle'
+import OrderActions from '@/components/phone/OrderActions'
 import { useAccess } from '@/hooks/useMe'
-import type { Order } from '@/types'
+import { useIsPhone } from '@/hooks/useIsPhone'
+import type { Order, OrderStatus } from '@/types'
 import { statusColor } from '@/utils/orderStatus'
 import { SOURCE_LABELS, orderSource } from '@/utils/orderSource'
 import { printOrderSlip } from '@/utils/orderExport'
@@ -33,10 +37,14 @@ interface OrderDetailModalProps {
   order: Order | null
   open: boolean
   onClose: () => void
+  saving: boolean
+  // Moving the order on; the page asks whatever it needs to first
+  onMove: (order: Order, status: OrderStatus) => void
 }
 
-export default function OrderDetailModal({ order, open, onClose }: OrderDetailModalProps) {
+export default function OrderDetailModal({ order, open, onClose, saving, onMove }: OrderDetailModalProps) {
   const [editing, setEditing] = useState(false)
+  const isPhone = useIsPhone()
   const { can } = useAccess()
 
   if (!order) return null
@@ -50,11 +58,29 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
   }
 
   return (
-    <Dialog open={open} onClose={close} maxWidth="md" fullWidth>
-      <DialogTitle>
-        Order Details: {order.orderNumber}
-      </DialogTitle>
-      <DialogContent>
+    <Dialog open={open} onClose={close} maxWidth="md" fullWidth fullScreen={isPhone}>
+      {isPhone ? (
+        <Stack
+          direction="row"
+          spacing={0.5}
+          sx={{ alignItems: 'center', bgcolor: 'primary.main', color: 'primary.contrastText', px: 1, height: 56, flexShrink: 0 }}
+        >
+          <IconButton color="inherit" onClick={close} aria-label="Close order">
+            <CloseIcon />
+          </IconButton>
+          <Typography variant="h6" component="h2" sx={{ flex: 1, letterSpacing: '0.04em' }}>
+            {order.orderNumber}
+          </Typography>
+          <IconButton color="inherit" onClick={() => printOrderSlip(order)} aria-label="Print slip">
+            <PrintIcon />
+          </IconButton>
+        </Stack>
+      ) : (
+        <DialogTitle>
+          Order Details: {order.orderNumber}
+        </DialogTitle>
+      )}
+      <DialogContent sx={{ px: { xs: 2, md: 3 } }}>
         <Stack spacing={3} sx={{ mt: 1 }}>
           {/* This phone's order history and block mark */}
           <CustomerSummary phone={order.phone} />
@@ -145,32 +171,28 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
             <Typography variant="subtitle2" color="text.secondary" gutterBottom>
               Items
             </Typography>
-            <Table size="small">
-              <TableBody>
-                {order.items.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>
-                      {item.name}
-                      {item.preorder && (
-                        <Chip
-                          size="small"
-                          color="info"
-                          variant="outlined"
-                          label={item.preorderDays ? `Pre-order, about ${item.preorderDays} days` : 'Pre-order'}
-                          sx={{ ml: 1 }}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell align="right">
+            <Stack divider={<Divider />} spacing={1}>
+              {order.items.map((item, index) => (
+                <Stack key={index} direction="row" spacing={2} sx={{ justifyContent: 'space-between' }}>
+                  <div>
+                    <Typography>{item.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">
                       {formatPrice(item.price)} × {item.quantity}
-                    </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'medium' }}>
-                      {formatPrice(item.price * item.quantity)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </Typography>
+                    {item.preorder && (
+                      <Chip
+                        size="small"
+                        color="info"
+                        variant="outlined"
+                        label={item.preorderDays ? `Pre-order, about ${item.preorderDays} days` : 'Pre-order'}
+                        sx={{ mt: 0.5 }}
+                      />
+                    )}
+                  </div>
+                  <Typography sx={{ fontWeight: 500, flexShrink: 0 }}>{formatPrice(item.price * item.quantity)}</Typography>
+                </Stack>
+              ))}
+            </Stack>
           </div>
 
           <Divider />
@@ -231,12 +253,18 @@ export default function OrderDetailModal({ order, open, onClose }: OrderDetailMo
           <OrderTimeline order={order} canAddNotes={can('orders.edit')} />
         </Stack>
       </DialogContent>
-      <DialogActions>
-        <Button startIcon={<PrintIcon />} onClick={() => printOrderSlip(order)}>
-          Print slip
-        </Button>
-        <Button onClick={close}>Close</Button>
-      </DialogActions>
+      {isPhone ? (
+        <Stack sx={{ p: 1.5, pb: 'calc(12px + env(safe-area-inset-bottom, 0px))', borderTop: 1, borderColor: 'divider' }}>
+          <OrderActions order={order} canEdit={can('orders.edit')} saving={saving} onMove={onMove} />
+        </Stack>
+      ) : (
+        <DialogActions>
+          <Button startIcon={<PrintIcon />} onClick={() => printOrderSlip(order)}>
+            Print slip
+          </Button>
+          <Button onClick={close}>Close</Button>
+        </DialogActions>
+      )}
     </Dialog>
   )
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { canMoveTo, NEXT_STATUSES, STATUSES } from './orderStatus'
+import { canMoveTo, exitSteps, NEXT_STATUSES, nextStep, STATUSES } from './orderStatus'
 
 describe('order status flow', () => {
   it('only moves forward', () => {
@@ -31,6 +31,15 @@ describe('order status flow', () => {
 
   it('never offers moving to the same status', () => {
     for (const s of STATUSES) expect(NEXT_STATUSES[s]).not.toContain(s)
+  })
+
+  it('splits each status into one next step and its early exits', () => {
+    expect(nextStep('Pending')).toBe('Processing')
+    expect(exitSteps('Pending')).toEqual(['Cancelled'])
+    expect(nextStep('Shipped')).toBe('Delivered')
+    expect(exitSteps('Shipped')).toEqual(['Returned'])
+    expect(nextStep('Delivered')).toBeUndefined()
+    expect(exitSteps('Delivered')).toEqual([])
   })
 })
 

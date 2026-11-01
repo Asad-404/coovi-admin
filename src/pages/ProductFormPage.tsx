@@ -3,20 +3,30 @@ import type { ChangeEvent, FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Avatar,
+  Box,
   Button,
   Card,
   CardContent,
   CircularProgress,
   FormControlLabel,
+  IconButton,
   Stack,
   Switch,
   TextField,
   Typography,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import CloseIcon from '@mui/icons-material/Close'
 import CloudUploadIcon from '@mui/icons-material/CloudUpload'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import StarBorderIcon from '@mui/icons-material/StarBorder'
+import StickyActions from '@/components/phone/StickyActions'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
 import {
@@ -24,7 +34,10 @@ import {
   checkImageFile,
   checkShareImage,
   getUploadErrorMessage,
+  moveImageUrlFirst,
+  parseImages,
   readImageSize,
+  removeImageUrl,
   uploadsApi,
 } from '@/api/uploads'
 import { useNotify } from '@/notify/context'
@@ -103,12 +116,6 @@ const isHttpUrl = (value: string): boolean => {
 // Length limits from the API's product schema
 const maxLength = (n: number) => ({ htmlInput: { maxLength: n } })
 
-const parseImages = (text: string): string[] =>
-  text
-    .split('\n')
-    .map((line) => line.trim())
-    .filter(Boolean)
-
 export default function ProductFormPage() {
   const { slug } = useParams()
   const isEdit = Boolean(slug)
@@ -159,6 +166,10 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
   const [slugEdited, setSlugEdited] = useState(false)
   const [error, setError] = useState('')
   const [uploading, setUploading] = useState(false)
+  // Rarely needed fields start folded away; a problem in one opens it
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [linksOpen, setLinksOpen] = useState(false)
+  const isPhone = useIsPhone()
 
   const saveMutation = useMutation({
     mutationFn: (data: Partial<Product>) =>
@@ -254,11 +265,17 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
     const cost = form.costPrice === '' ? null : Number(form.costPrice)
 
     // Same rules as the API's product schema, checked here for a friendlier message
-    if (!form.name || !form.slug) {
-      setError('Name and slug are required')
+    if (!form.name) {
+      setError('Name is required')
+      return
+    }
+    if (!form.slug) {
+      setMoreOpen(true)
+      setError('Web address (slug) is required')
       return
     }
     if (!SLUG_PATTERN.test(form.slug)) {
+      setMoreOpen(true)
       setError('Slug must be lowercase letters and numbers joined by single hyphens, e.g. red-silk-saree')
       return
     }
@@ -274,7 +291,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
       setError('Cost price must be 0 or more (or leave it empty if you are not sure)')
       return
     }
-    if (!Number.isInteger(stock) || stock < 0) {
+    if (form.stock.trim() === '' || !Number.isInteger(stock) || stock < 0) {
       setError('Stock must be a whole number, 0 or more')
       return
     }
@@ -283,16 +300,18 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
       return
     }
     if (images.length === 0) {
-      setError('At least one image URL is required')
+      setError('Add at least one photo')
       return
     }
     const badImage = images.find((url) => !isHttpUrl(url))
     if (badImage) {
+      setLinksOpen(true)
       setError(`Not a valid image URL: ${badImage}`)
       return
     }
     const shareImage = form.shareImage.trim()
     if (shareImage && !isHttpUrl(shareImage)) {
+      setMoreOpen(true)
       setError(`Not a valid share image URL: ${shareImage}`)
       return
     }
@@ -320,23 +339,107 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
 
   const imagePreviews = parseImages(form.imagesText)
 
-  return (
-    <Stack spacing={3} component="form" onSubmit={handleSubmit}>
-      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/products')}>
-          Back
-        </Button>
-        <Typography variant="h4">
-          {isEdit ? 'Edit Product' : 'Add Product'}
-        </Typography>
-      </Stack>
+  const uploadIcon = uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />
+  // On a phone number boxes sit in pairs, so more of the form fits on screen
+  const numberGrid = { display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2, alignItems: 'start' }
 
-      {error && <Alert severity="error">{error}</Alert>}
+  return (
+    <Stack spacing={isPhone ? 2 : 3} component="form" onSubmit={handleSubmit} noValidate>
+      {!isPhone && (
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/products')}>
+            Back
+          </Button>
+          <Typography variant="h4">
+            {isEdit ? 'Edit Product' : 'Add Product'}
+          </Typography>
+        </Stack>
+      )}
+
+      {/* Photos come first: this is what sells a saree, and they are usually on this phone */}
+      <Card>
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6">Photos</Typography>
+            {imagePreviews.length > 0 && (
+              <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 1 }}>
+                {imagePreviews.map((url, i) => (
+                  <Box key={`${url}-${i}`} sx={{ position: 'relative' }}>
+                    <Avatar
+                      variant="rounded"
+                      src={url}
+                      alt={`Photo ${i + 1}`}
+                      sx={{ width: '100%', height: 'auto', aspectRatio: '3 / 4', outline: i === 0 ? 2 : 0, outlineColor: 'secondary.main' }}
+                    />
+                    {i === 0 ? (
+                      <Typography
+                        variant="caption"
+                        sx={{ position: 'absolute', left: 4, bottom: 4, px: 0.75, borderRadius: 1, bgcolor: 'secondary.main', color: 'secondary.contrastText', fontWeight: 600 }}
+                      >
+                        Thumbnail
+                      </Typography>
+                    ) : (
+                      <IconButton
+                        size="small"
+                        aria-label={`Use photo ${i + 1} as the thumbnail`}
+                        onClick={() => set('imagesText', moveImageUrlFirst(form.imagesText, i))}
+                        sx={{ position: 'absolute', left: 2, bottom: 2, minWidth: 36, minHeight: 36, color: 'common.white', bgcolor: 'rgba(12,41,83,0.7)', '&:hover': { bgcolor: 'rgba(12,41,83,0.85)' } }}
+                      >
+                        <StarBorderIcon fontSize="small" />
+                      </IconButton>
+                    )}
+                    <IconButton
+                      size="small"
+                      aria-label={`Remove photo ${i + 1}`}
+                      onClick={() => set('imagesText', removeImageUrl(form.imagesText, i))}
+                      sx={{ position: 'absolute', right: 2, top: 2, minWidth: 36, minHeight: 36, color: 'common.white', bgcolor: 'rgba(12,41,83,0.7)', '&:hover': { bgcolor: 'rgba(12,41,83,0.85)' } }}
+                    >
+                      <CloseIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                ))}
+              </Box>
+            )}
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
+              <Button component="label" variant="outlined" disabled={uploading} startIcon={uploadIcon}>
+                {uploading ? 'Uploading…' : 'Upload photos'}
+                <input type="file" accept="image/*" multiple hidden onChange={handleFilesPicked} />
+              </Button>
+              <Typography variant="body2" color="text.secondary">
+                JPG, PNG or WebP, up to 10 MB each
+              </Typography>
+            </Stack>
+            <Accordion
+              disableGutters
+              elevation={0}
+              expanded={linksOpen}
+              onChange={(_, open) => setLinksOpen(open)}
+              sx={{ bgcolor: 'transparent', '&::before': { display: 'none' } }}
+            >
+              <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ px: 0 }}>
+                <Typography variant="body2">Paste photo links instead</Typography>
+              </AccordionSummary>
+              <AccordionDetails sx={{ px: 0 }}>
+                <TextField
+                  label="Photo links (one per line)"
+                  value={form.imagesText}
+                  onChange={(e) => set('imagesText', e.target.value)}
+                  multiline
+                  rows={4}
+                  fullWidth
+                  helperText="Uploaded photos are added here. The first one is the thumbnail"
+                />
+              </AccordionDetails>
+            </Accordion>
+          </Stack>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent>
-          <Stack spacing={3}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+          <Stack spacing={2}>
+            <Typography variant="h6">Name and price</Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <TextField
                 label="Name (English)"
                 slotProps={maxLength(120)}
@@ -353,20 +456,129 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 fullWidth
               />
             </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+            <Box sx={numberGrid}>
               <TextField
-                label="Slug (URL part)"
-                slotProps={maxLength(100)}
-                value={form.slug}
-                onChange={(e) => {
-                  setSlugEdited(true)
-                  set('slug', e.target.value)
-                }}
-                helperText="Auto-generated from the name — editable"
+                label="Price (BDT)"
+                slotProps={{ htmlInput: { min: 0, step: 1, inputMode: 'numeric' } }}
+                type="number"
+                value={form.price}
+                onChange={(e) => set('price', e.target.value)}
+                helperText="What the customer pays"
                 required
-                fullWidth
               />
+              <TextField
+                label="Stock"
+                slotProps={{ htmlInput: { min: 0, step: 1, inputMode: 'numeric' } }}
+                type="number"
+                value={form.stock}
+                onChange={(e) => set('stock', e.target.value)}
+                helperText="Pieces you have"
+                required
+              />
+              <TextField
+                label="Original price"
+                slotProps={{ htmlInput: { min: 0, step: 1, inputMode: 'numeric' } }}
+                type="number"
+                value={form.compareAtPrice}
+                onChange={(e) => set('compareAtPrice', e.target.value)}
+                helperText="Optional. Higher than the price puts it On Sale"
+              />
+              {canSeeCost && (
+                <TextField
+                  label="Cost price"
+                  slotProps={{ htmlInput: { min: 0, step: 'any', inputMode: 'decimal' } }}
+                  type="number"
+                  value={form.costPrice}
+                  onChange={(e) => set('costPrice', e.target.value)}
+                  helperText="What you paid for one. Customers never see it"
+                />
+              )}
+            </Box>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <Stack spacing={1}>
+            <Typography variant="h6">Selling</Typography>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.inStock}
+                  onChange={(e) => set('inStock', e.target.checked)}
+                />
+              }
+              label="Available for sale"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={form.allowPreorder}
+                  onChange={(e) => set('allowPreorder', e.target.checked)}
+                />
+              }
+              label="Take pre-orders when out of stock"
+            />
+            {form.allowPreorder && (
+              <TextField
+                label="Pre-order wait (days)"
+                slotProps={{ htmlInput: { min: 1, max: 90, step: 1, inputMode: 'numeric' } }}
+                type="number"
+                value={form.preorderDays}
+                onChange={(e) => set('preorderDays', e.target.value)}
+                helperText="Shown to the customer. Pre-ordered pieces are never added to stock"
+                sx={{ maxWidth: { md: 320 }, pt: 1 }}
+              />
+            )}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6">Description</Typography>
+            <TextField
+              label="Description (English)"
+              slotProps={maxLength(2000)}
+              value={form.description}
+              onChange={(e) => set('description', e.target.value)}
+              multiline
+              minRows={3}
+              fullWidth
+            />
+            <TextField
+              label="Description (Bengali)"
+              slotProps={maxLength(2000)}
+              value={form.descriptionBn}
+              onChange={(e) => set('descriptionBn', e.target.value)}
+              multiline
+              minRows={3}
+              fullWidth
+            />
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Accordion expanded={moreOpen} onChange={(_, open) => setMoreOpen(open)} sx={{ '&::before': { display: 'none' } }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+          <Typography variant="h6">Web address, category and sharing</Typography>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Stack spacing={2}>
+            <TextField
+              label="Slug (URL part)"
+              slotProps={maxLength(100)}
+              value={form.slug}
+              onChange={(e) => {
+                setSlugEdited(true)
+                set('slug', e.target.value)
+              }}
+              helperText="Auto-generated from the name — editable"
+              fullWidth
+            />
+            <Stack direction="row" spacing={2}>
               <TextField
                 label="Category"
                 slotProps={maxLength(50)}
@@ -382,124 +594,8 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 fullWidth
               />
             </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-              <TextField
-                label="Price (BDT)"
-                slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                type="number"
-                value={form.price}
-                onChange={(e) => set('price', e.target.value)}
-                helperText="What the customer pays"
-                required
-                fullWidth
-              />
-              <TextField
-                label="Original price (BDT)"
-                slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                type="number"
-                value={form.compareAtPrice}
-                onChange={(e) => set('compareAtPrice', e.target.value)}
-                helperText="Optional. Higher than the price puts the product On Sale"
-                fullWidth
-              />
-              {canSeeCost && (
-                <TextField
-                  label="Cost price (BDT)"
-                  slotProps={{ htmlInput: { min: 0, step: 'any' } }}
-                  type="number"
-                  value={form.costPrice}
-                  onChange={(e) => set('costPrice', e.target.value)}
-                  helperText="What you paid for one piece. Only for profit; customers never see it"
-                  fullWidth
-                />
-              )}
-              <TextField
-                label="Stock"
-                slotProps={{ htmlInput: { min: 0, step: 1 } }}
-                type="number"
-                value={form.stock}
-                onChange={(e) => set('stock', e.target.value)}
-                required
-                fullWidth
-              />
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.inStock}
-                    onChange={(e) => set('inStock', e.target.checked)}
-                  />
-                }
-                label="Available for sale"
-              />
-            </Stack>
-
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ alignItems: { md: 'center' } }}>
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={form.allowPreorder}
-                    onChange={(e) => set('allowPreorder', e.target.checked)}
-                  />
-                }
-                label="Take pre-orders when out of stock"
-              />
-              <TextField
-                label="Pre-order wait (days)"
-                slotProps={{ htmlInput: { min: 1, max: 90, step: 1 } }}
-                type="number"
-                value={form.preorderDays}
-                onChange={(e) => set('preorderDays', e.target.value)}
-                helperText="Shown to the customer. Pre-ordered pieces are never added to stock"
-                disabled={!form.allowPreorder}
-                sx={{ maxWidth: { md: 260 } }}
-              />
-            </Stack>
-
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-              <Button
-                component="label"
-                variant="outlined"
-                disabled={uploading}
-                startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
-              >
-                {uploading ? 'Uploading…' : 'Upload photos'}
-                <input type="file" accept="image/*" multiple hidden onChange={handleFilesPicked} />
-              </Button>
-              <Typography variant="body2" color="text.secondary">
-                JPG, PNG or WebP, up to 10 MB each
-              </Typography>
-            </Stack>
-            <TextField
-              label="Image URLs (one per line)"
-              value={form.imagesText}
-              onChange={(e) => set('imagesText', e.target.value)}
-              multiline
-              rows={4}
-              helperText="Uploaded photos are added here. First image is used as the product thumbnail"
-              required
-            />
-            {imagePreviews.length > 0 && (
-              <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 1 }}>
-                {imagePreviews.map((url, i) => (
-                  <Avatar
-                    key={`${url}-${i}`}
-                    variant="rounded"
-                    src={url}
-                    alt={`Image ${i + 1}`}
-                    sx={{ width: 72, height: 72, outline: i === 0 ? 2 : 0, outlineColor: 'secondary.main' }}
-                  />
-                ))}
-              </Stack>
-            )}
-
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-              <Button
-                component="label"
-                variant="outlined"
-                disabled={uploading}
-                startIcon={uploading ? <CircularProgress size={20} color="inherit" /> : <CloudUploadIcon />}
-              >
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ alignItems: { sm: 'center' } }}>
+              <Button component="label" variant="outlined" disabled={uploading} startIcon={uploadIcon}>
                 {uploading ? 'Uploading…' : 'Upload share image'}
                 <input type="file" accept="image/jpeg,image/png,image/webp" hidden onChange={handleShareImagePicked} />
               </Button>
@@ -522,47 +618,33 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 sx={{ width: 191, height: 100 }}
               />
             )}
-
-            <TextField
-              label="Description (English)"
-              slotProps={maxLength(2000)}
-              value={form.description}
-              onChange={(e) => set('description', e.target.value)}
-              multiline
-              rows={3}
-              fullWidth
-            />
-            <TextField
-              label="Description (Bengali)"
-              slotProps={maxLength(2000)}
-              value={form.descriptionBn}
-              onChange={(e) => set('descriptionBn', e.target.value)}
-              multiline
-              rows={3}
-              fullWidth
-            />
-
-            <Stack direction="row" spacing={2}>
-              <Button
-                type="submit"
-                variant="contained"
-                size="large"
-                disabled={saveMutation.isPending || uploading}
-                startIcon={saveMutation.isPending ? <CircularProgress size={20} color="inherit" /> : undefined}
-              >
-                {saveMutation.isPending
-                  ? 'Saving…'
-                  : isEdit
-                    ? 'Save Changes'
-                    : 'Create Product'}
-              </Button>
-              <Button size="large" onClick={() => navigate('/products')}>
-                Cancel
-              </Button>
-            </Stack>
           </Stack>
-        </CardContent>
-      </Card>
+        </AccordionDetails>
+      </Accordion>
+
+      <StickyActions error={error} onCloseError={() => setError('')}>
+        <Stack direction="row" spacing={2}>
+          <Button
+            type="submit"
+            variant="contained"
+            size="large"
+            fullWidth={isPhone}
+            disabled={saveMutation.isPending || uploading}
+            startIcon={saveMutation.isPending ? <CircularProgress size={20} color="inherit" /> : undefined}
+          >
+            {saveMutation.isPending
+              ? 'Saving…'
+              : isEdit
+                ? 'Save Changes'
+                : 'Create Product'}
+          </Button>
+          {!isPhone && (
+            <Button size="large" onClick={() => navigate('/products')}>
+              Cancel
+            </Button>
+          )}
+        </Stack>
+      </StickyActions>
     </Stack>
   )
 }
