@@ -15,7 +15,7 @@ const dayLabel = (date: string): string =>
 const ordersText = (n: number): string => `${n} order${n === 1 ? '' : 's'}`
 
 // Single-series bar chart per day: taka when `money` is on, otherwise order counts.
-// Hover a day for its numbers.
+// Hover or tap a day for its numbers.
 export default function RevenueChart({ data, money }: { data: ChartDay[]; money: boolean }) {
   const amount = (d: ChartDay): number => (money ? (d.value ?? 0) : d.orders)
   const show = (n: number): string => (money ? formatPrice(n) : ordersText(n))
@@ -43,7 +43,7 @@ export default function RevenueChart({ data, money }: { data: ChartDay[]; money:
           const height = max > 0 ? Math.max((n / max) * CHART_HEIGHT, n > 0 ? 2 : 0) : 0
           const text = money ? `${formatPrice(n)} · ${ordersText(d.orders)}` : ordersText(d.orders)
           return (
-            <Tooltip key={d.date} title={`${dayLabel(d.date)}: ${text}`} placement="top">
+            <Tooltip key={d.date} title={`${dayLabel(d.date)}: ${text}`} placement="top" enterTouchDelay={0} leaveTouchDelay={3000}>
               {/* Full-height hit area so short bars are still easy to hover */}
               <Box
                 role="listitem"

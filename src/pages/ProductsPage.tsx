@@ -5,12 +5,14 @@ import {
   Alert,
   Avatar,
   Button,
+  ButtonBase,
   Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   IconButton,
   MenuItem,
   Paper,
@@ -29,6 +31,12 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import EditIcon from '@mui/icons-material/Edit'
 import DeleteIcon from '@mui/icons-material/Delete'
+import TuneIcon from '@mui/icons-material/Tune'
+import AddFab from '@/components/phone/AddFab'
+import BottomSheet from '@/components/phone/BottomSheet'
+import ChipRow from '@/components/phone/ChipRow'
+import PageHeader from '@/components/phone/PageHeader'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
 import { useLowStockThreshold } from '@/api/settings'
@@ -52,6 +60,8 @@ export default function ProductsPage() {
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState('')
   const [sort, setSort] = useState<ProductSort>('newest')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+  const isPhone = useIsPhone()
 
   // In the URL so the dashboard can link to /products?stock=low
   const stockParam = searchParams.get('stock') as StockFilter | null
@@ -90,10 +100,58 @@ export default function ProductsPage() {
   const categories = products ? categoriesOf(products) : []
   const hasFilters = Boolean(search || category || stock !== 'all')
 
+  const categorySelect = (
+    <Select
+      value={category}
+      onChange={(e) => setCategory(e.target.value)}
+      size="small"
+      displayEmpty
+      sx={{ minWidth: 160 }}
+      inputProps={{ 'aria-label': 'Category' }}
+    >
+      <MenuItem value="">All categories</MenuItem>
+      {categories.map((c) => (
+        <MenuItem key={c} value={c}>
+          {c}
+        </MenuItem>
+      ))}
+    </Select>
+  )
+
+  const sortSelect = (
+    <Select
+      value={sort}
+      onChange={(e) => setSort(e.target.value as ProductSort)}
+      size="small"
+      sx={{ minWidth: 170 }}
+      inputProps={{ 'aria-label': 'Sort' }}
+    >
+      <MenuItem value="newest">Newest first</MenuItem>
+      <MenuItem value="name-asc">Name A–Z</MenuItem>
+      <MenuItem value="price-asc">Price: low to high</MenuItem>
+      <MenuItem value="price-desc">Price: high to low</MenuItem>
+      <MenuItem value="stock-asc">Stock: lowest first</MenuItem>
+    </Select>
+  )
+
+  const stockChips = (product: Product) => (
+    <>
+      <Chip
+        size="small"
+        label={`${product.stock} in stock`}
+        color={product.stock === 0 ? 'error' : product.stock < lowStockThreshold ? 'warning' : 'success'}
+      />
+      {/* Switched off in the form: the shop shows it as out of stock and the API refuses orders */}
+      {!product.inStock && <Chip size="small" variant="outlined" label="Not for sale" />}
+      {product.inStock && product.allowPreorder && (
+        <Chip size="small" variant="outlined" color="info" label="Pre-order" />
+      )}
+    </>
+  )
+
   return (
-    <Stack spacing={3}>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
-        <Typography variant="h4">Products</Typography>
+    <Stack spacing={isPhone ? 1 : 3}>
+      <PageHeader title="Products">
         {can('products.edit') && (
           <Button
             variant="contained"
@@ -103,45 +161,61 @@ export default function ProductsPage() {
             Add Product
           </Button>
         )}
-      </Stack>
+      </PageHeader>
 
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-        <TextField
-          placeholder="Search by name or slug..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          size="small"
-          sx={{ flex: 1 }}
-        />
-        <Select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          size="small"
-          displayEmpty
-          sx={{ minWidth: 160 }}
-        >
-          <MenuItem value="">All categories</MenuItem>
-          {categories.map((c) => (
-            <MenuItem key={c} value={c}>
-              {c}
-            </MenuItem>
-          ))}
-        </Select>
-        <Select value={stock} onChange={(e) => setStock(e.target.value as StockFilter)} size="small" sx={{ minWidth: 150 }}>
-          <MenuItem value="all">Any stock</MenuItem>
-          <MenuItem value="low">Low stock (&lt; {lowStockThreshold})</MenuItem>
-          <MenuItem value="out">Out of stock</MenuItem>
-        </Select>
-        <Select value={sort} onChange={(e) => setSort(e.target.value as ProductSort)} size="small" sx={{ minWidth: 170 }}>
-          <MenuItem value="newest">Newest first</MenuItem>
-          <MenuItem value="name-asc">Name A–Z</MenuItem>
-          <MenuItem value="price-asc">Price: low to high</MenuItem>
-          <MenuItem value="price-desc">Price: high to low</MenuItem>
-          <MenuItem value="stock-asc">Stock: lowest first</MenuItem>
-        </Select>
-      </Stack>
+      {isPhone ? (
+        <>
+          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+            <TextField
+              placeholder="Search by name"
+              aria-label="Search products"
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              size="small"
+              sx={{ flex: 1 }}
+            />
+            <IconButton onClick={() => setFiltersOpen(true)} aria-label="Category and sort">
+              <TuneIcon />
+            </IconButton>
+          </Stack>
+          <ChipRow
+            label="Stock"
+            sticky
+            value={stock}
+            onChange={setStock}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'low', label: `Low stock (under ${lowStockThreshold})` },
+              { value: 'out', label: 'Out of stock' },
+            ]}
+          />
+          <BottomSheet open={filtersOpen} title="Category and sort" onClose={() => setFiltersOpen(false)}>
+            {categorySelect}
+            {sortSelect}
+            <Button variant="contained" onClick={() => setFiltersOpen(false)}>Show products</Button>
+          </BottomSheet>
+        </>
+      ) : (
+        <Stack direction="row" spacing={2}>
+          <TextField
+            placeholder="Search by name or slug..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            size="small"
+            sx={{ flex: 1 }}
+          />
+          {categorySelect}
+          <Select value={stock} onChange={(e) => setStock(e.target.value as StockFilter)} size="small" sx={{ minWidth: 150 }}>
+            <MenuItem value="all">Any stock</MenuItem>
+            <MenuItem value="low">Low stock (&lt; {lowStockThreshold})</MenuItem>
+            <MenuItem value="out">Out of stock</MenuItem>
+          </Select>
+          {sortSelect}
+        </Stack>
+      )}
 
       {isLoading ? (
         <Paper sx={{ p: 2 }}>
@@ -161,6 +235,46 @@ export default function ProductsPage() {
           <Typography variant="body2" color="text.secondary">
             Showing {visible?.length ?? 0} of {products?.length ?? 0} products
           </Typography>
+          {isPhone ? (
+            <Paper variant="outlined" sx={{ borderRadius: '12px', overflow: 'hidden' }}>
+              <Stack divider={<Divider />}>
+                {visible?.map((product) => (
+                  <Stack key={product._id} direction="row" sx={{ alignItems: 'center' }}>
+                    <ButtonBase
+                      disabled={!can('products.edit')}
+                      onClick={() => navigate(`/products/${product.slug}/edit`)}
+                      aria-label={`Edit ${product.name}`}
+                      sx={{ flex: 1, minWidth: 0, justifyContent: 'flex-start', textAlign: 'left', gap: 1.5, p: 1.5 }}
+                    >
+                      <Avatar variant="rounded" src={product.images[0]} alt="" sx={{ width: 72, height: 88, flexShrink: 0 }} />
+                      <Stack sx={{ minWidth: 0, flex: 1 }}>
+                        <Typography sx={{ fontWeight: 500 }} noWrap>{product.name}</Typography>
+                        <Stack direction="row" spacing={1} sx={{ alignItems: 'baseline', mb: 0.5 }}>
+                          <Typography sx={{ fontWeight: 700 }}>{formatPrice(product.price)}</Typography>
+                          {product.compareAtPrice != null && product.compareAtPrice > product.price && (
+                            <Typography variant="body2" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
+                              {formatPrice(product.compareAtPrice)}
+                            </Typography>
+                          )}
+                        </Stack>
+                        <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5 }}>{stockChips(product)}</Stack>
+                      </Stack>
+                    </ButtonBase>
+                    {can('products.delete') && (
+                      <IconButton onClick={() => setDeleteTarget(product)} aria-label={`Delete ${product.name}`} sx={{ mr: 0.5 }}>
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
+                  </Stack>
+                ))}
+                {visible?.length === 0 && (
+                  <Typography align="center" color="text.secondary" sx={{ py: 4 }}>
+                    {hasFilters ? 'No products match your filters.' : 'No products yet. Tap Add product to create your first one.'}
+                  </Typography>
+                )}
+              </Stack>
+            </Paper>
+          ) : (
           <TableContainer component={Paper}>
             <Table sx={{ minWidth: 720 }}>
               <TableHead>
@@ -203,18 +317,7 @@ export default function ProductsPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Stack direction="row" spacing={0.5}>
-                        <Chip
-                          size="small"
-                          label={`${product.stock} in stock`}
-                          color={product.stock === 0 ? 'error' : product.stock < lowStockThreshold ? 'warning' : 'success'}
-                        />
-                        {/* Switched off in the form: the shop shows it as out of stock and the API refuses orders */}
-                        {!product.inStock && <Chip size="small" variant="outlined" label="Not for sale" />}
-                        {product.inStock && product.allowPreorder && (
-                          <Chip size="small" variant="outlined" color="info" label="Pre-order" />
-                        )}
-                      </Stack>
+                      <Stack direction="row" spacing={0.5}>{stockChips(product)}</Stack>
                     </TableCell>
                     <TableCell>{product.category}</TableCell>
                     <TableCell align="right">
@@ -254,7 +357,12 @@ export default function ProductsPage() {
               </TableBody>
             </Table>
           </TableContainer>
+          )}
         </>
+      )}
+
+      {isPhone && can('products.edit') && (
+        <AddFab label="Add product" icon={<AddIcon />} onClick={() => navigate('/products/new')} />
       )}
 
       <Dialog open={deleteTarget !== null} onClose={() => !deleteMutation.isPending && setDeleteTarget(null)}>

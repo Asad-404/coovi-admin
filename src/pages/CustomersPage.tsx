@@ -3,11 +3,15 @@ import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import {
   Alert,
+  Box,
+  ButtonBase,
   Chip,
   Dialog,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControlLabel,
+  IconButton,
   MenuItem,
   Paper,
   Select,
@@ -26,7 +30,13 @@ import {
   Typography,
 } from '@mui/material'
 import { alpha } from '@mui/material/styles'
+import CloseIcon from '@mui/icons-material/Close'
 import { customersApi, type CustomerQuery } from '@/api/customers'
+import ChipRow from '@/components/phone/ChipRow'
+import ContactButtons from '@/components/phone/ContactButtons'
+import PageHeader from '@/components/phone/PageHeader'
+import Pager from '@/components/phone/Pager'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import CustomerSummary from '@/components/CustomerSummary'
 import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import { useAccess } from '@/hooks/useMe'
@@ -43,8 +53,18 @@ const SORT_LABELS: Record<CustomerSort, string> = {
   refused: 'Most refused or cancelled first',
 }
 
+// The phone's filter row: one tap per way of looking at the list
+type PhoneView = CustomerSort | 'blocked'
+const PHONE_VIEWS: { value: PhoneView; label: string }[] = [
+  { value: 'recent', label: 'Latest' },
+  { value: 'orders', label: 'Most orders' },
+  { value: 'refused', label: 'Most refused' },
+  { value: 'blocked', label: 'Blocked' },
+]
+
 // One phone's history: summary, block button and its latest orders
 function CustomerDialog({ customer, onClose }: { customer: Customer | null; onClose: () => void }) {
+  const isPhone = useIsPhone()
   const { data, isLoading } = useQuery({
     queryKey: ['customers', 'one', customer?.phone],
     queryFn: () => customersApi.get(customer!.phone),
@@ -52,13 +72,25 @@ function CustomerDialog({ customer, onClose }: { customer: Customer | null; onCl
   })
 
   return (
-    <Dialog open={Boolean(customer)} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
-        {customer?.name || 'Customer'} · {customer?.phone}
+    <Dialog open={Boolean(customer)} onClose={onClose} maxWidth="sm" fullWidth fullScreen={isPhone}>
+      <DialogTitle sx={isPhone ? { display: 'flex', alignItems: 'center', gap: 0.5, pl: 1, pr: 2 } : undefined}>
+        {isPhone && (
+          <IconButton onClick={onClose} aria-label="Close customer">
+            <CloseIcon />
+          </IconButton>
+        )}
+        <Box component="span" sx={{ minWidth: 0 }}>
+          {customer?.name || 'Customer'} · {customer?.phone}
+        </Box>
       </DialogTitle>
       <DialogContent>
         {customer && (
           <Stack spacing={2} sx={{ mt: 1 }}>
+            {isPhone && (
+              <Stack direction="row" spacing={1}>
+                <ContactButtons phone={customer.phone} name={customer.name} />
+              </Stack>
+            )}
             <CustomerSummary phone={customer.phone} linkToList={false} />
             <Typography variant="body2" color="text.secondary">
               {customer.address}
@@ -66,6 +98,20 @@ function CustomerDialog({ customer, onClose }: { customer: Customer | null; onCl
             </Typography>
             {isLoading ? (
               <Skeleton variant="rounded" height={120} />
+            ) : isPhone ? (
+              <Stack divider={<Divider />} spacing={1}>
+                {data?.orders.map((order) => (
+                  <Stack key={order._id} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                    <Stack sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography sx={{ fontWeight: 700, letterSpacing: '0.04em' }}>{order.orderNumber}</Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {formatDate(order.createdAt)}, {formatPrice(order.total)}
+                      </Typography>
+                    </Stack>
+                    <Chip size="small" label={order.status} color={statusColor[order.status]} />
+                  </Stack>
+                ))}
+              </Stack>
             ) : (
               <Table size="small">
                 <TableHead>
@@ -126,41 +172,67 @@ export default function CustomersPage() {
   })
   const total = data?.total ?? 0
   const showMoney = can('money.view')
+  const isPhone = useIsPhone()
 
   return (
-    <Stack spacing={3}>
-      <Typography variant="h4">Customers</Typography>
-      <Typography variant="body2" color="text.secondary">
-        Everyone who has ordered, by phone number. Open a customer to see their orders or block the number.
-        Orders from a blocked number still come in, marked in red, so you can call before shipping.
-      </Typography>
+    <Stack spacing={isPhone ? 1 : 3}>
+      <PageHeader title="Customers" />
+      {!isPhone && (
+        <Typography variant="body2" color="text.secondary">
+          Everyone who has ordered, by phone number. Open a customer to see their orders or block the number.
+          Orders from a blocked number still come in, marked in red, so you can call before shipping.
+        </Typography>
+      )}
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' } }}>
-        <TextField
-          placeholder="Search by phone or name..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          size="small"
-          sx={{ flex: 1 }}
-        />
-        <Select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as CustomerSort)}
-          size="small"
-          sx={{ minWidth: 240 }}
-          inputProps={{ 'aria-label': 'Sort' }}
-        >
-          {(Object.keys(SORT_LABELS) as CustomerSort[]).map((key) => (
-            <MenuItem key={key} value={key}>
-              {SORT_LABELS[key]}
-            </MenuItem>
-          ))}
-        </Select>
-        <FormControlLabel
-          control={<Switch checked={blockedOnly} onChange={(e) => setBlockedOnly(e.target.checked)} />}
-          label="Blocked only"
-        />
-      </Stack>
+      {isPhone ? (
+        <>
+          <TextField
+            placeholder="Phone or name"
+            aria-label="Search customers"
+            type="search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+          />
+          <ChipRow
+            label="Show"
+            sticky
+            value={blockedOnly ? 'blocked' : sort}
+            onChange={(view: PhoneView) => {
+              setBlockedOnly(view === 'blocked')
+              if (view !== 'blocked') setSort(view)
+            }}
+            options={PHONE_VIEWS}
+          />
+        </>
+      ) : (
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <TextField
+            placeholder="Search by phone or name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            size="small"
+            sx={{ flex: 1 }}
+          />
+          <Select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as CustomerSort)}
+            size="small"
+            sx={{ minWidth: 240 }}
+            inputProps={{ 'aria-label': 'Sort' }}
+          >
+            {(Object.keys(SORT_LABELS) as CustomerSort[]).map((key) => (
+              <MenuItem key={key} value={key}>
+                {SORT_LABELS[key]}
+              </MenuItem>
+            ))}
+          </Select>
+          <FormControlLabel
+            control={<Switch checked={blockedOnly} onChange={(e) => setBlockedOnly(e.target.checked)} />}
+            label="Blocked only"
+          />
+        </Stack>
+      )}
 
       {isLoading ? (
         <Paper sx={{ p: 2 }}>
@@ -170,6 +242,47 @@ export default function CustomersPage() {
         </Paper>
       ) : isError ? (
         <Alert severity="error">Could not load customers. Try again in a moment.</Alert>
+      ) : isPhone ? (
+        <Stack spacing={1.5}>
+          <Paper variant="outlined" sx={{ borderRadius: '12px', overflow: 'hidden' }}>
+            <Stack divider={<Divider />}>
+              {data?.customers.map((customer) => (
+                <Stack
+                  key={customer.phone}
+                  direction="row"
+                  spacing={1}
+                  sx={{ alignItems: 'center', pr: 1.5, ...(customer.blocked && { bgcolor: (theme) => alpha(theme.palette.error.main, 0.08) }) }}
+                >
+                  <ButtonBase
+                    onClick={() => setSelected(customer)}
+                    sx={{ flex: 1, minWidth: 0, display: 'block', textAlign: 'left', p: 1.5 }}
+                  >
+                    <Typography sx={{ fontWeight: 500 }} noWrap>{customer.name}</Typography>
+                    <Typography variant="body2" color="text.secondary">{customer.phone}</Typography>
+                    <Typography variant="body2">
+                      {customer.orders} order{customer.orders === 1 ? '' : 's'}, {customer.delivered} delivered
+                      {customer.returned > 0 && `, ${customer.returned} refused`}
+                      {customer.cancelled > 0 && `, ${customer.cancelled} cancelled`}
+                    </Typography>
+                    {(customer.blocked || customer.risky) && (
+                      <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                        {customer.blocked && <Chip size="small" color="error" label="Blocked" />}
+                        {customer.risky && <Chip size="small" color="warning" variant="outlined" label="Risky" />}
+                      </Stack>
+                    )}
+                  </ButtonBase>
+                  <ContactButtons phone={customer.phone} name={customer.name} />
+                </Stack>
+              ))}
+              {data?.customers.length === 0 && (
+                <Typography align="center" color="text.secondary" sx={{ py: 4 }}>
+                  {search || blockedOnly ? 'No customers match.' : 'No customers yet.'}
+                </Typography>
+              )}
+            </Stack>
+          </Paper>
+          <Pager page={page} pageSize={pageSize} total={total} onChange={(next) => setPaging({ queryKey, page: next })} />
+        </Stack>
       ) : (
         <TableContainer component={Paper}>
           <Table sx={{ minWidth: 800 }}>

@@ -14,6 +14,7 @@ import {
   DialogContentText,
   DialogTitle,
   MenuItem,
+  Paper,
   Skeleton,
   Stack,
   Table,
@@ -30,6 +31,9 @@ import { adminsApi } from '@/api/admins'
 import type { TeamMemberUpdate } from '@/api/admins'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
+import AddFab from '@/components/phone/AddFab'
+import PageHeader from '@/components/phone/PageHeader'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { useAccess } from '@/hooks/useMe'
 import {
   ACCESS_ROWS,
@@ -69,6 +73,7 @@ function AccessDialog({ member, onClose }: { member: Admin | null; onClose: () =
 
   const owner = role === 'owner'
   const custom = !owner && !sameAsPreset(role, permissions)
+  const isPhone = useIsPhone()
 
   const mutation = useMutation({
     // Matching the role's preset is saved as just the role, so it stays "not custom"
@@ -98,7 +103,7 @@ function AccessDialog({ member, onClose }: { member: Admin | null; onClose: () =
     ) : null
 
   return (
-    <Dialog open={member !== null} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={member !== null} onClose={onClose} maxWidth="sm" fullWidth fullScreen={isPhone}>
       <DialogTitle>Access for {member?.name}</DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ mt: 1 }}>
@@ -293,6 +298,7 @@ export default function TeamPage() {
   const [accessTarget, setAccessTarget] = useState<Admin | null>(null)
   const [resetTarget, setResetTarget] = useState<Admin | null>(null)
   const [error, setError] = useState('')
+  const isPhone = useIsPhone()
 
   const { data: team, isLoading, isError } = useQuery({ queryKey: ['admins'], queryFn: adminsApi.list })
 
@@ -308,12 +314,11 @@ export default function TeamPage() {
 
   return (
     <Stack spacing={3}>
-      <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-        <Typography variant="h4">Team</Typography>
+      <PageHeader title="Team">
         <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => setAddOpen(true)}>
           Add team member
         </Button>
-      </Stack>
+      </PageHeader>
 
       <Typography color="text.secondary">
         Each person has a role, and you can adjust what they can see and change with Access. Changes apply on their
@@ -324,7 +329,44 @@ export default function TeamPage() {
       {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
       {isLoading && <Skeleton variant="rounded" height={160} />}
 
-      {team && (
+      {team && isPhone && (
+        <Stack spacing={1.5}>
+          {team.map((member) => {
+            const isMe = member._id === myId
+            const active = member.active !== false
+            return (
+              <Paper key={member._id} variant="outlined" sx={{ borderRadius: '12px', p: 1.5 }}>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Typography sx={{ fontWeight: 600 }} noWrap>{member.name}</Typography>
+                  {isMe && <Chip size="small" label="You" />}
+                  <span style={{ flex: 1 }} />
+                  <Chip size="small" color={active ? 'success' : 'default'} label={active ? 'Active' : 'Switched off'} />
+                </Stack>
+                <Typography variant="body2" color="text.secondary" noWrap>{member.email}</Typography>
+                <Typography variant="body2">
+                  {roleLabel(member.role)}{member.customized ? ', custom access' : ''}
+                </Typography>
+                <Stack direction="row" sx={{ flexWrap: 'wrap', gap: 0.5, mt: 1, mx: -0.5 }}>
+                  <Button size="small" onClick={() => setAccessTarget(member)}>Access</Button>
+                  {!isMe && <Button size="small" onClick={() => setResetTarget(member)}>Reset password</Button>}
+                  <Button
+                    size="small"
+                    color={active ? 'error' : 'primary'}
+                    disabled={update.isPending}
+                    onClick={() => update.mutate({ id: member._id, changes: { active: !active } })}
+                  >
+                    {active ? 'Switch off' : 'Switch on'}
+                  </Button>
+                </Stack>
+              </Paper>
+            )
+          })}
+        </Stack>
+      )}
+
+      {isPhone && <AddFab label="Add member" icon={<PersonAddIcon />} onClick={() => setAddOpen(true)} />}
+
+      {team && !isPhone && (
         <Card>
           <TableContainer>
             <Table>

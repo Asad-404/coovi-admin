@@ -9,6 +9,9 @@ import {
   checkImageFile,
   checkShareImage,
   getUploadErrorMessage,
+  moveImageUrlFirst,
+  parseImages,
+  removeImageUrl,
   uploadsApi,
 } from './uploads'
 
@@ -124,5 +127,21 @@ describe('getUploadErrorMessage', () => {
     expect(getUploadErrorMessage(axiosError({ message: 'Image upload is not configured on the server' }))).toBe(
       'Image upload is not configured on the server',
     )
+  })
+})
+
+describe('photo list helpers', () => {
+  const text = 'https://a.jpg\n https://b.jpg \n\nhttps://c.jpg'
+
+  it('reads one link per line and skips blanks', () => {
+    expect(parseImages(text)).toEqual(['https://a.jpg', 'https://b.jpg', 'https://c.jpg'])
+  })
+
+  it('removes one photo', () => {
+    expect(removeImageUrl(text, 1)).toBe('https://a.jpg\nhttps://c.jpg')
+  })
+
+  it('moves a photo to the front, where it becomes the thumbnail', () => {
+    expect(moveImageUrlFirst(text, 2)).toBe('https://c.jpg\nhttps://a.jpg\nhttps://b.jpg')
   })
 })

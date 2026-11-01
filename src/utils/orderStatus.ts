@@ -38,3 +38,22 @@ export const CANCEL_REASONS = [
   'Out of stock',
   'Duplicate order',
 ] as const
+
+// What the button says for moving an order to a status
+export const STEP_LABELS: Record<Exclude<OrderStatus, 'Pending'>, string> = {
+  Processing: 'Confirm order',
+  Shipped: 'Mark shipped',
+  Delivered: 'Mark delivered',
+  Cancelled: 'Cancel order',
+  Returned: 'Refused at door',
+}
+
+const isExit = (status: OrderStatus): boolean => status === 'Cancelled' || status === 'Returned'
+
+// The normal next step, shown as the main button; undefined once the order is final
+export const nextStep = (status: OrderStatus): Exclude<OrderStatus, 'Pending'> | undefined =>
+  NEXT_STATUSES[status].find((s) => !isExit(s)) as Exclude<OrderStatus, 'Pending'> | undefined
+
+// The ways an order can stop early, kept out of the way in a menu
+export const exitSteps = (status: OrderStatus): ('Cancelled' | 'Returned')[] =>
+  NEXT_STATUSES[status].filter(isExit) as ('Cancelled' | 'Returned')[]

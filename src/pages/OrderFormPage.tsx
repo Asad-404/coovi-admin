@@ -3,7 +3,6 @@ import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  Alert,
   Autocomplete,
   Button,
   Card,
@@ -12,18 +11,22 @@ import {
   CircularProgress,
   IconButton,
   MenuItem,
+  Paper,
   Stack,
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableRow,
   TextField,
   Tooltip,
   Typography,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import RemoveIcon from '@mui/icons-material/Remove'
+import StickyActions from '@/components/phone/StickyActions'
+import { useIsPhone } from '@/hooks/useIsPhone'
 import { ordersApi } from '@/api/orders'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
@@ -55,6 +58,7 @@ export default function OrderFormPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const notify = useNotify()
+  const isPhone = useIsPhone()
 
   const [lines, setLines] = useState<Line[]>([])
   const [customerName, setCustomerName] = useState('')
@@ -94,6 +98,8 @@ export default function OrderFormPage() {
   }
   const setQuantity = (id: string, quantity: string) =>
     setLines((current) => current.map((l) => (l.product._id === id ? { ...l, quantity } : l)))
+  const stepQuantity = (line: Line, change: number) =>
+    setQuantity(line.product._id, String(Math.min(Math.max((Number(line.quantity) || 0) + change, 1), MAX_QUANTITY)))
   const removeLine = (id: string) => setLines((current) => current.filter((l) => l.product._id !== id))
 
   const feeText = deliveryFeeText ?? (shopFee === undefined ? '' : String(shopFee))
@@ -143,20 +149,20 @@ export default function OrderFormPage() {
   }
 
   return (
-    <Stack spacing={3} component="form" onSubmit={handleSubmit} noValidate>
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-        <IconButton onClick={() => navigate('/orders')} aria-label="Back to orders">
-          <ArrowBackIcon />
-        </IconButton>
-        <Typography variant="h4">Add order</Typography>
-      </Stack>
+    <Stack spacing={isPhone ? 2 : 3} component="form" onSubmit={handleSubmit} noValidate>
+      {!isPhone && (
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <IconButton onClick={() => navigate('/orders')} aria-label="Back to orders">
+            <ArrowBackIcon />
+          </IconButton>
+          <Typography variant="h4">Add order</Typography>
+        </Stack>
+      )}
 
-      <Typography color="text.secondary">
+      <Typography color="text.secondary" variant={isPhone ? 'body2' : 'body1'}>
         For orders taken by Facebook, WhatsApp or phone. Prices come from the shop's product list. The order
         starts as Pending; stock is taken when you confirm it, the same as a website order.
       </Typography>
-
-      {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
       {/* Sarees */}
       <Card>
@@ -173,7 +179,7 @@ export default function OrderFormPage() {
               getOptionDisabled={(p) => lineAvailability(p, 1) === 'short'}
               renderOption={({ key, ...props }, p) => (
                 <li key={key} {...props}>
-                  <Stack direction="row" sx={{ justifyContent: 'space-between', width: '100%', gap: 2 }}>
+                  <Stack direction={isPhone ? 'column' : 'row'} sx={{ justifyContent: 'space-between', width: '100%', gap: isPhone ? 0 : 2 }}>
                     <span>{p.name}</span>
                     <Typography variant="body2" color="text.secondary">
                       {formatPrice(p.price)} ·{' '}
@@ -186,60 +192,57 @@ export default function OrderFormPage() {
             />
 
             {lines.length > 0 && (
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Saree</TableCell>
-                    <TableCell align="right">Price</TableCell>
-                    <TableCell sx={{ width: 110 }}>Quantity</TableCell>
-                    <TableCell align="right">Amount</TableCell>
-                    <TableCell />
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {lines.map((line) => {
-                    const quantity = Number(line.quantity) || 0
-                    const availability = lineAvailability(line.product, quantity)
-                    return (
-                      <TableRow key={line.product._id}>
-                        <TableCell>
-                          {line.product.name}
+              <Stack spacing={1}>
+                {lines.map((line) => {
+                  const quantity = Number(line.quantity) || 0
+                  const availability = lineAvailability(line.product, quantity)
+                  return (
+                    <Paper key={line.product._id} variant="outlined" sx={{ p: 1.5 }}>
+                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <Typography sx={{ fontWeight: 500 }}>{line.product.name}</Typography>
+                          <Typography variant="body2" color="text.secondary">{formatPrice(line.product.price)} each</Typography>
                           {availability === 'preorder' && (
                             <Chip
                               size="small"
                               color="info"
                               variant="outlined"
                               label={`Pre-order, about ${line.product.preorderDays ?? 15} days`}
-                              sx={{ ml: 1 }}
+                              sx={{ mt: 0.5 }}
                             />
                           )}
                           {availability === 'short' && (
-                            <Chip size="small" color="error" label={`Only ${line.product.stock} left`} sx={{ ml: 1 }} />
+                            <Chip size="small" color="error" label={`Only ${line.product.stock} left`} sx={{ mt: 0.5 }} />
                           )}
-                        </TableCell>
-                        <TableCell align="right">{formatPrice(line.product.price)}</TableCell>
-                        <TableCell>
+                        </div>
+                        <Tooltip title="Remove">
+                          <IconButton size="small" onClick={() => removeLine(line.product._id)} aria-label={`Remove ${line.product.name}`}>
+                            <DeleteIcon fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                      </Stack>
+                      <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 1 }}>
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
+                          <IconButton onClick={() => stepQuantity(line, -1)} aria-label={`One less ${line.product.name}`} sx={{ border: 1, borderColor: 'divider' }}>
+                            <RemoveIcon />
+                          </IconButton>
                           <TextField
-                            type="number"
                             size="small"
                             value={line.quantity}
                             onChange={(e) => setQuantity(line.product._id, e.target.value)}
-                            slotProps={{ htmlInput: { min: 1, max: MAX_QUANTITY, 'aria-label': `${line.product.name} quantity` } }}
+                            sx={{ width: 64 }}
+                            slotProps={{ htmlInput: { inputMode: 'numeric', style: { textAlign: 'center' }, 'aria-label': `${line.product.name} quantity` } }}
                           />
-                        </TableCell>
-                        <TableCell align="right">{formatPrice(line.product.price * quantity)}</TableCell>
-                        <TableCell align="right">
-                          <Tooltip title="Remove">
-                            <IconButton size="small" onClick={() => removeLine(line.product._id)} aria-label={`Remove ${line.product.name}`}>
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
+                          <IconButton onClick={() => stepQuantity(line, 1)} aria-label={`One more ${line.product.name}`} sx={{ border: 1, borderColor: 'divider' }}>
+                            <AddIcon />
+                          </IconButton>
+                        </Stack>
+                        <Typography sx={{ fontWeight: 700 }}>{formatPrice(line.product.price * quantity)}</Typography>
+                      </Stack>
+                    </Paper>
+                  )
+                })}
+              </Stack>
             )}
           </Stack>
         </CardContent>
@@ -261,6 +264,7 @@ export default function OrderFormPage() {
               />
               <TextField
                 label="Phone"
+                type="tel"
                 required
                 fullWidth
                 value={phone}
@@ -316,7 +320,7 @@ export default function OrderFormPage() {
                 value={feeText}
                 onChange={(e) => setDeliveryFeeText(e.target.value)}
                 helperText={shopFee !== undefined ? `Shop's normal fee is ${formatPrice(shopFee)}` : ' '}
-                slotProps={{ htmlInput: { min: 0, step: 1 } }}
+                slotProps={{ htmlInput: { min: 0, step: 1, inputMode: 'numeric' } }}
               />
               <TextField
                 label="Discount (৳)"
@@ -355,19 +359,28 @@ export default function OrderFormPage() {
         </CardContent>
       </Card>
 
-      <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end' }}>
-        <Button onClick={() => navigate('/orders')} disabled={createMutation.isPending}>
-          Cancel
-        </Button>
-        <Button
-          type="submit"
-          variant="contained"
-          disabled={createMutation.isPending}
-          startIcon={createMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
-        >
-          Add order
-        </Button>
-      </Stack>
+      <StickyActions error={error} onCloseError={() => setError('')}>
+        <Stack direction="row" spacing={2} sx={{ justifyContent: 'flex-end', alignItems: 'center' }}>
+          {isPhone ? (
+            <Stack sx={{ flex: 1 }}>
+              <Typography variant="caption" color="text.secondary">Total to collect</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.2 }}>{formatPrice(totals.total)}</Typography>
+            </Stack>
+          ) : (
+            <Button onClick={() => navigate('/orders')} disabled={createMutation.isPending}>
+              Cancel
+            </Button>
+          )}
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={createMutation.isPending}
+            startIcon={createMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
+          >
+            Add order
+          </Button>
+        </Stack>
+      </StickyActions>
     </Stack>
   )
 }

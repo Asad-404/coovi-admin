@@ -1,5 +1,6 @@
-import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material'
+import { Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle, Link, Typography } from '@mui/material'
 import type { Order } from '@/types'
+import { telHref } from '@/utils/phone'
 
 interface CallWarningDialogProps {
   // The order about to move to Processing without a call confirmation; null keeps it closed
@@ -20,7 +21,7 @@ export default function CallWarningDialog({ order, saving, onClose, onConfirm }:
       <DialogTitle>Has {order.customerName} confirmed by call?</DialogTitle>
       <DialogContent>
         <Typography>
-          Order {order.orderNumber} is not marked as confirmed by call. Call {order.phone} before moving it to
+          Order {order.orderNumber} is not marked as confirmed by call. Call <Link href={telHref(order.phone)}>{order.phone}</Link> before moving it to
           Processing: anyone can type someone else's number at checkout.
         </Typography>
       </DialogContent>
