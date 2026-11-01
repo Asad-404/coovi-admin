@@ -20,6 +20,24 @@ export const checkImageFile = (file: File): string | null => {
   return null
 }
 
+// Every card and gallery on the shop shows a photo in an upright 3:4 frame, so other shapes get cropped
+export const PHOTO_EXAMPLE = '1200 x 1600 px'
+const PHOTO_RATIO = 3 / 4
+const MIN_PHOTO_WIDTH = 600
+// A pixel or two off the exact shape is fine
+const RATIO_TOLERANCE = 0.02
+
+const isRatio = (size: ImageSize, wanted: number): boolean =>
+  Math.abs(size.width / size.height - wanted) / wanted <= RATIO_TOLERANCE
+
+// Returns why a product photo has the wrong shape or size, or null when it is fine
+export const checkPhotoSize = (name: string, size: ImageSize): string | null => {
+  const measured = `${name} is ${size.width} x ${size.height} px`
+  if (!isRatio(size, PHOTO_RATIO)) return `${measured}. Photos must be upright 3:4, for example ${PHOTO_EXAMPLE}`
+  if (size.width < MIN_PHOTO_WIDTH) return `${measured}, too small. Use ${PHOTO_EXAMPLE}`
+  return null
+}
+
 // Share image: the wide picture Facebook, Messenger and WhatsApp show when a product link is shared.
 // 1200x630 is Facebook's recommended size; WhatsApp often skips preview images above about 300 KB
 export const SHARE_IMAGE_WIDTH = 1200
@@ -33,41 +51,80 @@ export interface ImageSize {
   height: number
 }
 
-// Returns why a picked share image should not be used, or null when it is fine.
 // Any 1.91:1 picture of at least 600 px wide passes, so 1200x630 and 1201x630 both work
-export const checkShareImage = (file: File, size: ImageSize): string | null => {
-  const problem = checkImageFile(file)
-  if (problem) return problem
+const checkShareImageSize = (name: string, size: ImageSize): string | null => {
   const wanted = `${SHARE_IMAGE_WIDTH} x ${SHARE_IMAGE_HEIGHT} px`
-  const ratio = size.width / size.height
-  const wantedRatio = SHARE_IMAGE_WIDTH / SHARE_IMAGE_HEIGHT
-  if (Math.abs(ratio - wantedRatio) / wantedRatio > 0.02) {
-    return `${file.name} is ${size.width} x ${size.height} px. A share image must be a wide ${wanted} picture`
+  if (!isRatio(size, SHARE_IMAGE_WIDTH / SHARE_IMAGE_HEIGHT)) {
+    return `${name} is ${size.width} x ${size.height} px. A share image must be a wide ${wanted} picture`
   }
   if (size.width < MIN_SHARE_IMAGE_WIDTH) {
-    return `${file.name} is ${size.width} x ${size.height} px, too small. Use ${wanted}`
+    return `${name} is ${size.width} x ${size.height} px, too small. Use ${wanted}`
   }
+  return null
+}
+
+// Returns why a picked share image should not be used, or null when it is fine.
+export const checkShareImage = (file: File, size: ImageSize): string | null => {
+  const problem = checkImageFile(file) ?? checkShareImageSize(file.name, size)
+  if (problem) return problem
   if (file.size > MAX_SHARE_IMAGE_BYTES) {
     return `${file.name} is ${Math.round(file.size / 1024)} KB. Save it as a JPG under 300 KB so WhatsApp shows it`
   }
   return null
 }
 
-// Reads a picked image's width and height in the browser
-export const readImageSize = (file: File): Promise<ImageSize> =>
+const loadImageSize = (src: string): Promise<ImageSize> =>
   new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
     const img = new Image()
-    img.onload = () => {
-      URL.revokeObjectURL(url)
-      resolve({ width: img.naturalWidth, height: img.naturalHeight })
-    }
-    img.onerror = () => {
-      URL.revokeObjectURL(url)
-      reject(new Error(`Could not read ${file.name} as an image`))
-    }
-    img.src = url
+    img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight })
+    img.onerror = () => reject(new Error(`Could not open ${src}`))
+    img.src = src
   })
+
+// Reads a picked image's width and height in the browser
+export const readImageSize = async (file: File): Promise<ImageSize> => {
+  const url = URL.createObjectURL(file)
+  try {
+    return await loadImageSize(url)
+  } catch {
+    throw new Error(`Could not read ${file.name} as an image`)
+  } finally {
+    URL.revokeObjectURL(url)
+  }
+}
+
+// What a product needs before customers can see it. The API refuses to publish without these too
+export const MIN_PUBLISHED_PHOTOS = 3
+
+export type PublishProblem = { field: 'photos' | 'shareImage'; message: string }
+
+export const checkPublishNeeds = (images: string[], shareImage: string): PublishProblem | null => {
+  if (new Set(images).size < MIN_PUBLISHED_PHOTOS) {
+    return { field: 'photos', message: `Add at least ${MIN_PUBLISHED_PHOTOS} different photos before publishing` }
+  }
+  if (!shareImage) return { field: 'shareImage', message: 'Add a share image before publishing' }
+  return null
+}
+
+// Opens the saved pictures, which also catches a pasted link that was never checked on upload.
+// The sizes come in as a parameter so this can be tested without a browser
+export const findPictureProblem = async (
+  images: string[],
+  shareImage: string,
+  readSize: (url: string) => Promise<ImageSize> = loadImageSize,
+): Promise<PublishProblem | null> => {
+  for (const [i, url] of images.entries()) {
+    const name = `Photo ${i + 1}`
+    const size = await readSize(url).catch(() => null)
+    if (!size) return { field: 'photos', message: `Could not open ${name.toLowerCase()}. Check the link or upload it again` }
+    const message = checkPhotoSize(name, size)
+    if (message) return { field: 'photos', message }
+  }
+  const size = await readSize(shareImage).catch(() => null)
+  if (!size) return { field: 'shareImage', message: 'Could not open the share image. Check the link or upload it again' }
+  const message = checkShareImageSize('Share image', size)
+  return message ? { field: 'shareImage', message } : null
+}
 
 // Adds uploaded URLs as new lines below whatever is already in the URL box
 export const appendImageUrls = (text: string, urls: string[]): string =>

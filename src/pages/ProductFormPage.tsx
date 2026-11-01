@@ -14,6 +14,10 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControlLabel,
   IconButton,
   Stack,
@@ -33,14 +37,20 @@ import { getErrorMessage } from '@/api/errors'
 import {
   appendImageUrls,
   checkImageFile,
+  checkPhotoSize,
+  checkPublishNeeds,
   checkShareImage,
+  findPictureProblem,
   getUploadErrorMessage,
+  MIN_PUBLISHED_PHOTOS,
+  PHOTO_EXAMPLE,
   moveImageUrlFirst,
   parseImages,
   readImageSize,
   removeImageUrl,
   uploadsApi,
 } from '@/api/uploads'
+import type { PublishProblem } from '@/api/uploads'
 import { useNotify } from '@/notify/context'
 import { slugify } from '@/utils/format'
 import type { Product } from '@/types'
@@ -170,10 +180,14 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
   // Rarely needed fields start folded away; a problem in one opens it
   const [moreOpen, setMoreOpen] = useState(false)
   const [linksOpen, setLinksOpen] = useState(false)
+  const [checkingPictures, setCheckingPictures] = useState(false)
   const isPhone = useIsPhone()
 
   // A new product stays a draft until someone presses Publish
   const isPublished = product?.published ?? false
+  // Customers are looking at a published product: ask before opening it for editing.
+  // Here rather than on the list so every way into this page is covered, including a saved link
+  const [editConfirmed, setEditConfirmed] = useState(!isPublished)
 
   const saveMutation = useMutation({
     mutationFn: (data: Partial<Product>) =>
@@ -223,6 +237,13 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
 
     setUploading(true)
     try {
+      for (const file of files) {
+        const sizeProblem = checkPhotoSize(file.name, await readImageSize(file))
+        if (sizeProblem) {
+          setError(sizeProblem)
+          return
+        }
+      }
       const signature = await uploadsApi.getSignature()
       for (const file of files) {
         const url = await uploadsApi.uploadImage(file, signature)
@@ -263,10 +284,15 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
   // Enter in a text box and the save button keep the product as it is, so typing can never publish it
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault()
-    save(isPublished)
+    void save(isPublished)
   }
 
-  const save = (published: boolean) => {
+  const showPublishProblem = (problem: PublishProblem) => {
+    if (problem.field === 'shareImage') setMoreOpen(true)
+    setError(problem.message)
+  }
+
+  const save = async (published: boolean) => {
     setError('')
 
     const images = parseImages(form.imagesText)
@@ -329,6 +355,27 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
       return
     }
 
+    // Same rule as the API: only when a product goes live or its pictures change, so a
+    // product published before these rules can still have its price or stock changed
+    const picturesChanged =
+      !product || images.join('\
+') !== product.images.join('\
+') || shareImage !== (product.shareImage ?? '')
+    if (published && (!isPublished || picturesChanged)) {
+      const missing = checkPublishNeeds(images, shareImage)
+      if (missing) {
+        showPublishProblem(missing)
+        return
+      }
+      setCheckingPictures(true)
+      const pictureProblem = await findPictureProblem(images, shareImage)
+      setCheckingPictures(false)
+      if (pictureProblem) {
+        showPublishProblem(pictureProblem)
+        return
+      }
+    }
+
     saveMutation.mutate({
       name: form.name,
       nameBn: form.nameBn || undefined,
@@ -352,7 +399,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
   }
 
   const imagePreviews = parseImages(form.imagesText)
-  const busy = saveMutation.isPending || uploading
+  const busy = saveMutation.isPending || uploading || checkingPictures
   const pendingPublished = saveMutation.isPending ? saveMutation.variables?.published : undefined
   const spinner = <CircularProgress size={20} color="inherit" />
 
@@ -362,6 +409,19 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
 
   return (
     <Stack spacing={isPhone ? 2 : 3} component="form" onSubmit={handleSubmit} noValidate>
+      <Dialog open={!editConfirmed} onClose={() => navigate('/products')}>
+        <DialogTitle>Edit this published product?</DialogTitle>
+        <DialogContent>
+          <Typography>
+            {product?.name} is live on the shop. Customers will see your changes as soon as you save them.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => navigate('/products')}>Go back</Button>
+          <Button variant="contained" onClick={() => setEditConfirmed(true)}>Edit product</Button>
+        </DialogActions>
+      </Dialog>
+
       {!isPhone && (
         <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
           <Button startIcon={<ArrowBackIcon />} onClick={() => navigate('/products')}>
@@ -423,7 +483,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 <input type="file" accept="image/*" multiple hidden onChange={handleFilesPicked} />
               </Button>
               <Typography variant="body2" color="text.secondary">
-                JPG, PNG or WebP, up to 10 MB each
+                Upright 3:4, for example {PHOTO_EXAMPLE}. JPG, PNG or WebP, up to 10 MB each
               </Typography>
             </Stack>
             <Accordion
@@ -624,7 +684,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
               label="Share image URL (optional)"
               value={form.shareImage}
               onChange={(e) => set('shareImage', e.target.value)}
-              helperText="Shown when the product link is shared on Facebook, Messenger or WhatsApp. Empty uses the first photo"
+              helperText="Needed to publish. Shown when the product link is shared on Facebook, Messenger or WhatsApp"
               fullWidth
             />
             {form.shareImage.trim() && (
@@ -649,7 +709,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
             <Typography variant="body2" color="text.secondary">
               {isPublished
                 ? 'Customers can see and order this product. Unpublish takes it off the shop without deleting it.'
-                : 'Customers cannot see or order this product until you publish it.'}
+                : `Customers cannot see or order this product until you publish it. Publishing needs at least ${MIN_PUBLISHED_PHOTOS} photos and a share image (under "Web address, category and sharing").`}
             </Typography>
           </Stack>
         </CardContent>
@@ -665,9 +725,9 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 size="large"
                 fullWidth={isPhone}
                 disabled={busy}
-                startIcon={pendingPublished === true ? spinner : undefined}
+                startIcon={pendingPublished === true || checkingPictures ? spinner : undefined}
               >
-                {pendingPublished === true ? 'Saving…' : 'Save Changes'}
+                {checkingPictures ? 'Checking photos…' : pendingPublished === true ? 'Saving…' : 'Save Changes'}
               </Button>
               <Button
                 variant="outlined"
@@ -675,7 +735,7 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 fullWidth={isPhone}
                 disabled={busy}
                 startIcon={pendingPublished === false ? spinner : undefined}
-                onClick={() => save(false)}
+                onClick={() => void save(false)}
               >
                 {pendingPublished === false ? 'Unpublishing…' : 'Unpublish'}
               </Button>
@@ -697,10 +757,10 @@ function ProductForm({ product, costPrice, canSeeCost }: ProductFormProps) {
                 size="large"
                 fullWidth={isPhone}
                 disabled={busy}
-                startIcon={pendingPublished === true ? spinner : undefined}
-                onClick={() => save(true)}
+                startIcon={pendingPublished === true || checkingPictures ? spinner : undefined}
+                onClick={() => void save(true)}
               >
-                {pendingPublished === true ? 'Publishing…' : 'Publish'}
+                {checkingPictures ? 'Checking photos…' : pendingPublished === true ? 'Publishing…' : 'Publish'}
               </Button>
             </>
           )}
