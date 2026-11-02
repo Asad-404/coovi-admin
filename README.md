@@ -41,10 +41,13 @@ Never commit real URLs, credentials or tokens.
 ## How it fits together
 
 - `src/api/` — Axios client (adds the JWT, sends you to login when it expires) and one module per
-  resource. List endpoints are read page by page so stats, search and exports see every record.
-- `src/pages/` — Dashboard, Products (list + form), Orders, Login.
+  resource. Orders load one page at a time, with search and filters done by the API; the CSV
+  export reads every match. Products are read page by page into one list.
+- `src/pages/` — Dashboard, Products (list + form), Orders (list + manual order form), Customers,
+  Courier payments, Settings, Team, Login. Under 900 px the admin uses bottom tabs and cards, so the
+  shop can be run from a phone.
 - `src/utils/` — pure helpers (filters, stats, order status rules, CSV/print export) with tests
   next to them.
 - The API is authoritative for prices, stock, totals, delivery fees and status changes; the admin
-  only offers the forward order flow (Pending → Processing → Shipped → Delivered, or Cancelled
-  before shipping) so stock stays correct.
+  only offers the forward order flow (Pending → Processing → Shipped → Delivered, Cancelled
+  before shipping, or Returned for a parcel refused at the door) so stock stays correct.
