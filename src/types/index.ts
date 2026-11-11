@@ -153,6 +153,9 @@ export interface ManualOrderInput {
   phone: string
   address: string
   notes?: string
+  // Same rule as checkout: the API charges the area's fee unless deliveryFeeOverride is sent
+  district?: string
+  deliveryArea?: DeliveryArea
   source: ManualOrderSource
   items: { productId: string; quantity: number }[]
   deliveryFeeOverride?: number

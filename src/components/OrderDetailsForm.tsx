@@ -17,7 +17,7 @@ import { ordersApi } from '@/api/orders'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
 import type { DeliveryArea, Order, OrderDetailsUpdate } from '@/types'
-import { orderArea } from '@/utils/deliveryArea'
+import { areaForDistrict, orderArea } from '@/utils/deliveryArea'
 import { formatPrice } from '@/utils/format'
 
 interface OrderDetailsFormProps {
@@ -50,8 +50,7 @@ export default function OrderDetailsForm({ order, onDone }: OrderDetailsFormProp
 
   const changeDistrict = (value: string) => {
     setDistrict(value)
-    // Only Dhaka district can be inside Dhaka; picking Dhaka starts at the city
-    setArea(value === 'Dhaka' ? 'inside_dhaka' : 'outside_dhaka')
+    setArea(areaForDistrict(value))
   }
 
   const mutation = useMutation({

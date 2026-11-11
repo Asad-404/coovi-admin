@@ -30,12 +30,6 @@ export const ordersApi = {
     return res.data.data
   },
 
-  // GET /orders/delivery-fee -> { success, data: { deliveryFee } } — the fee checkout charges
-  getDeliveryFee: async (): Promise<number> => {
-    const res = await apiClient.get('/orders/delivery-fee')
-    return res.data.data.deliveryFee
-  },
-
   // GET /orders/delivery-fee -> { success, data: { deliveryFee, zones, districts } } (public)
   getDeliveryOptions: async (): Promise<DeliveryOptions> => {
     const res = await apiClient.get('/orders/delivery-fee')

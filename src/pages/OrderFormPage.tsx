@@ -9,9 +9,12 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControlLabel,
   IconButton,
   MenuItem,
   Paper,
+  Radio,
+  RadioGroup,
   Stack,
   Table,
   TableBody,
@@ -31,10 +34,11 @@ import { ordersApi } from '@/api/orders'
 import { productsApi } from '@/api/products'
 import { getErrorMessage } from '@/api/errors'
 import { useNotify } from '@/notify/context'
+import { DELIVERY_AREA_LABELS, areaForDistrict } from '@/utils/deliveryArea'
 import { formatPrice } from '@/utils/format'
 import { MANUAL_SOURCES, SOURCE_LABELS, previewTotals } from '@/utils/orderSource'
 import { lineAvailability } from '@/utils/preorder'
-import type { ManualOrderSource, Product } from '@/types'
+import type { DeliveryArea, ManualOrderSource, Product } from '@/types'
 
 interface Line {
   product: Product
@@ -52,8 +56,9 @@ const toWholeTaka = (value: string): number | null => {
 }
 
 // An order taken by Facebook, WhatsApp or phone. The admin picks sarees and
-// quantities; the API prices them from the database, so the total shown here
-// is a preview and the saved order is what the API answers.
+// quantities and the district; the API prices them from the database and
+// charges the area's fee (unless the admin agreed another), so the total shown
+// here is a preview and the saved order is what the API answers.
 export default function OrderFormPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -66,7 +71,10 @@ export default function OrderFormPage() {
   const [address, setAddress] = useState('')
   const [notes, setNotes] = useState('')
   const [source, setSource] = useState<ManualOrderSource | ''>('')
-  // null until the admin types a fee: then the shop's normal fee applies
+  // The district decides the area, except Dhaka, which can be the city or the suburbs
+  const [district, setDistrict] = useState('')
+  const [area, setArea] = useState<DeliveryArea | ''>('')
+  // null until the admin types a fee: then the chosen area's fee applies
   const [deliveryFeeText, setDeliveryFeeText] = useState<string | null>(null)
   const [discountText, setDiscountText] = useState('')
   const [error, setError] = useState('')
@@ -75,9 +83,11 @@ export default function OrderFormPage() {
     queryKey: ['products'],
     queryFn: productsApi.getAll,
   })
-  const { data: shopFee } = useQuery({
-    queryKey: ['delivery-fee'],
-    queryFn: ordersApi.getDeliveryFee,
+  // Same query as the order edit form, so the two share the cached fees and districts
+  const { data: deliveryOptions } = useQuery({
+    queryKey: ['delivery-options'],
+    queryFn: ordersApi.getDeliveryOptions,
+    staleTime: 60_000,
   })
 
   const createMutation = useMutation({
@@ -102,8 +112,17 @@ export default function OrderFormPage() {
     setQuantity(line.product._id, String(Math.min(Math.max((Number(line.quantity) || 0) + change, 1), MAX_QUANTITY)))
   const removeLine = (id: string) => setLines((current) => current.filter((l) => l.product._id !== id))
 
-  const feeText = deliveryFeeText ?? (shopFee === undefined ? '' : String(shopFee))
+  const changeDistrict = (value: string) => {
+    setDistrict(value)
+    setArea(areaForDistrict(value))
+  }
+
+  // The fee the API charges for the chosen area; unknown until a district is picked
+  const areaFee = area && deliveryOptions ? deliveryOptions.zones[area] : undefined
+  const feeOverridden = deliveryFeeText !== null
+  const feeText = deliveryFeeText ?? (areaFee === undefined ? '' : String(areaFee))
   const deliveryFee = toWholeTaka(feeText)
+  const feeKnown = feeOverridden || areaFee !== undefined
   const discount = toWholeTaka(discountText)
   const totals = previewTotals(
     lines.map((l) => ({ price: l.product.price, quantity: Number(l.quantity) || 0 })),
@@ -125,13 +144,14 @@ export default function OrderFormPage() {
       (!customerName.trim() && 'Customer name is required') ||
       (!PHONE_PATTERN.test(phone) && 'Phone must be 11 digits starting with 01') ||
       (address.trim().length < 5 && 'Address must be at least 5 characters') ||
+      ((!district || !area) && 'Choose the district the parcel goes to') ||
       (!source && 'Choose where the order came from') ||
       (deliveryFee === null && 'Delivery fee must be a whole number of taka, 0 or more') ||
       (discount === null && 'Discount must be a whole number of taka, 0 or more') ||
       ((discount ?? 0) > totals.subtotal && "Discount can't be more than the sarees' subtotal")
 
-    if (problem || !source) {
-      setError(problem || 'Choose where the order came from')
+    if (problem || !source || !area) {
+      setError(problem || 'Fill in the order details')
       return
     }
 
@@ -139,11 +159,13 @@ export default function OrderFormPage() {
       customerName: customerName.trim(),
       phone,
       address: address.trim(),
+      district,
+      deliveryArea: area,
       ...(notes.trim() && { notes: notes.trim() }),
       source,
       items,
-      // Only sent when changed, so the API applies the shop's current fee otherwise
-      ...(deliveryFeeText !== null && { deliveryFeeOverride: deliveryFee ?? 0 }),
+      // Only sent when changed, so the API charges its current fee for the area otherwise
+      ...(feeOverridden && { deliveryFeeOverride: deliveryFee ?? 0 }),
       ...(discount ? { discount } : {}),
     })
   }
@@ -296,6 +318,35 @@ export default function OrderFormPage() {
               onChange={(e) => setAddress(e.target.value)}
               slotProps={{ htmlInput: { maxLength: 500 } }}
             />
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} sx={{ alignItems: { md: 'center' } }}>
+              <TextField
+                select
+                label="District"
+                required
+                value={district}
+                onChange={(e) => changeDistrict(e.target.value)}
+                disabled={!deliveryOptions}
+                sx={{ minWidth: { md: 240 } }}
+                helperText={area ? `${DELIVERY_AREA_LABELS[area]} delivery` : 'Sets the delivery fee'}
+              >
+                {(deliveryOptions?.districts ?? []).map((name) => (
+                  <MenuItem key={name} value={name}>
+                    {name}
+                  </MenuItem>
+                ))}
+              </TextField>
+              {district === 'Dhaka' && (
+                <RadioGroup
+                  row
+                  value={area}
+                  onChange={(e) => setArea(e.target.value as DeliveryArea)}
+                  aria-label="Dhaka city or suburbs"
+                >
+                  <FormControlLabel value="inside_dhaka" control={<Radio />} label="Dhaka city" />
+                  <FormControlLabel value="outside_dhaka" control={<Radio />} label="Dhaka suburbs" />
+                </RadioGroup>
+              )}
+            </Stack>
             <TextField
               label="Notes (optional)"
               multiline
@@ -319,7 +370,11 @@ export default function OrderFormPage() {
                 type="number"
                 value={feeText}
                 onChange={(e) => setDeliveryFeeText(e.target.value)}
-                helperText={shopFee !== undefined ? `Shop's normal fee is ${formatPrice(shopFee)}` : ' '}
+                helperText={
+                  area && areaFee !== undefined
+                    ? `${DELIVERY_AREA_LABELS[area]} fee is ${formatPrice(areaFee)}`
+                    : 'Choose the district to see the fee'
+                }
                 slotProps={{ htmlInput: { min: 0, step: 1, inputMode: 'numeric' } }}
               />
               <TextField
@@ -345,12 +400,13 @@ export default function OrderFormPage() {
                 )}
                 <TableRow>
                   <TableCell>Delivery fee</TableCell>
-                  <TableCell align="right">{formatPrice(totals.deliveryFee)}</TableCell>
+                  <TableCell align="right">{feeKnown ? formatPrice(totals.deliveryFee) : 'Choose district'}</TableCell>
                 </TableRow>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold' }}>Total to collect</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold' }}>
                     {formatPrice(totals.total)}
+                    {!feeKnown && ' + delivery'}
                   </TableCell>
                 </TableRow>
               </TableBody>
@@ -364,7 +420,10 @@ export default function OrderFormPage() {
           {isPhone ? (
             <Stack sx={{ flex: 1 }}>
               <Typography variant="caption" color="text.secondary">Total to collect</Typography>
-              <Typography sx={{ fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.2 }}>{formatPrice(totals.total)}</Typography>
+              <Typography sx={{ fontWeight: 700, fontSize: '1.15rem', lineHeight: 1.2 }}>
+                {formatPrice(totals.total)}
+                {!feeKnown && ' + delivery'}
+              </Typography>
             </Stack>
           ) : (
             <Button onClick={() => navigate('/orders')} disabled={createMutation.isPending}>
