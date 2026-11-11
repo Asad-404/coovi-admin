@@ -68,8 +68,9 @@ export const downloadCsv = (filename: string, csv: string): void => {
 const escapeHtml = (value: string | number): string =>
   String(value).replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`)
 
-// Opens a clean printable slip (invoice + packing list in one) in a new window and starts the print dialog
-export const printOrderSlip = (order: Order): void => {
+// Opens a clean printable slip (invoice + packing list in one) in a new window and starts the print
+// dialog. Returns true if the window opened, false if the browser blocked the popup.
+export const printOrderSlip = (order: Order): boolean => {
   const rows = order.items
     .map(
       (item) => `<tr>
@@ -113,9 +114,10 @@ ${order.discount ? `      <tr><td colspan="3" class="num">Discount</td><td class
 </body></html>`
 
   const win = window.open('', '_blank', 'width=800,height=900')
-  if (!win) return
+  if (!win) return false
   win.document.write(html)
   win.document.close()
   win.focus()
   win.print()
+  return true
 }
