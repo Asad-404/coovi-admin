@@ -15,6 +15,7 @@ import {
   Typography,
 } from '@mui/material'
 import { useState } from 'react'
+import { useNotify } from '@/notify/context'
 import PrintIcon from '@mui/icons-material/Print'
 import EditIcon from '@mui/icons-material/Edit'
 import CloseIcon from '@mui/icons-material/Close'
@@ -46,6 +47,7 @@ export default function OrderDetailModal({ order, open, onClose, saving, onMove 
   const [editing, setEditing] = useState(false)
   const isPhone = useIsPhone()
   const { can } = useAccess()
+  const notify = useNotify()
 
   if (!order) return null
 
@@ -55,6 +57,10 @@ export default function OrderDetailModal({ order, open, onClose, saving, onMove 
   const close = () => {
     setEditing(false)
     onClose()
+  }
+
+  const printSlip = () => {
+    if (!printOrderSlip(order)) notify('Could not open the print window. Allow pop-ups for this site and try again.', 'error')
   }
 
   return (
@@ -71,7 +77,7 @@ export default function OrderDetailModal({ order, open, onClose, saving, onMove 
           <Typography variant="h6" component="h2" sx={{ flex: 1, letterSpacing: '0.04em' }}>
             {order.orderNumber}
           </Typography>
-          <IconButton color="inherit" onClick={() => printOrderSlip(order)} aria-label="Print slip">
+          <IconButton color="inherit" onClick={printSlip} aria-label="Print slip">
             <PrintIcon />
           </IconButton>
         </Stack>
@@ -259,7 +265,7 @@ export default function OrderDetailModal({ order, open, onClose, saving, onMove 
         </Stack>
       ) : (
         <DialogActions>
-          <Button startIcon={<PrintIcon />} onClick={() => printOrderSlip(order)}>
+          <Button startIcon={<PrintIcon />} onClick={printSlip}>
             Print slip
           </Button>
           <Button onClick={close}>Close</Button>

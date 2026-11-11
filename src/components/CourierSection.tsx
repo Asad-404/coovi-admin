@@ -75,7 +75,15 @@ export default function CourierSection({ order, canEdit }: CourierSectionProps) 
                     size="small"
                     aria-label="Copy tracking code"
                     sx={{ ml: 0.5 }}
-                    onClick={() => navigator.clipboard?.writeText(trackingCode).then(() => notify('Tracking code copied'))}
+                    onClick={() => {
+                      if (!navigator.clipboard) {
+                        notify('Could not copy to clipboard', 'error')
+                        return
+                      }
+                      navigator.clipboard.writeText(trackingCode)
+                        .then(() => notify('Tracking code copied'))
+                        .catch(() => notify('Could not copy to clipboard', 'error'))
+                    }}
                   >
                     <ContentCopyIcon fontSize="inherit" />
                   </IconButton>
