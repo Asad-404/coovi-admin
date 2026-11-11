@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { describeDelivery, orderArea } from './deliveryArea'
+import { areaForDistrict, describeDelivery, orderArea } from './deliveryArea'
 import { makeOrder } from '@/test/fixtures'
+
+describe('areaForDistrict', () => {
+  it('starts Dhaka inside Dhaka and puts every other district outside', () => {
+    expect(areaForDistrict('Dhaka')).toBe('inside_dhaka')
+    expect(areaForDistrict('Gazipur')).toBe('outside_dhaka')
+    expect(areaForDistrict('Sylhet')).toBe('outside_dhaka')
+  })
+})
 
 describe('orderArea', () => {
   it('treats an old order without an area as inside Dhaka', () => {

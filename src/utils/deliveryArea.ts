@@ -3,6 +3,10 @@ import type { DeliveryArea, Order } from '@/types'
 // Orders from before delivery areas have no area; they were charged the inside-Dhaka fee
 export const orderArea = (order: Order): DeliveryArea => order.deliveryArea ?? 'inside_dhaka'
 
+// The API's rule: only Dhaka district can be inside Dhaka. Picking Dhaka starts at the city.
+export const areaForDistrict = (district: string): DeliveryArea =>
+  district === 'Dhaka' ? 'inside_dhaka' : 'outside_dhaka'
+
 export const DELIVERY_AREA_LABELS: Record<DeliveryArea, string> = {
   inside_dhaka: 'Inside Dhaka',
   outside_dhaka: 'Outside Dhaka',
