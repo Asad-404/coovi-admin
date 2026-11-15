@@ -2,6 +2,11 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+# VITE_* variables are baked into the JS bundle at build time.
+# Passed as --build-arg from GitHub Actions (never from .env.production).
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
 COPY package.json pnpm-lock.yaml ./
