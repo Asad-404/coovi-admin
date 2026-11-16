@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { clearToken, getToken } from '@/utils/auth'
+import { parseApiError, logError } from '@/errors'
 
 const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
@@ -20,11 +21,23 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
+    // Parse error into structured format
+    const appError = parseApiError(error)
+
+    // Log error with context
+    logError(appError, {
+      endpoint: error.config?.url,
+      method: error.config?.method,
+    })
+
+    // Handle authentication errors
     if (error.response?.status === 401 && getToken()) {
       clearToken()
       window.location.href = '/login'
     }
-    return Promise.reject(error)
+
+    // Reject with structured error
+    return Promise.reject(appError)
   },
 )
 
