@@ -15,30 +15,44 @@ export interface ApiErrorResponse {
 }
 
 /**
- * Error codes from backend
+ * Legacy error response format (older API responses without structured error)
  */
-export enum ErrorCode {
+export interface LegacyErrorResponse {
+  success?: boolean;
+  message?: string;
+  errors?: string[];
+}
+
+/**
+ * Error codes from backend.
+ *
+ * Declared as a const object (not a TypeScript `enum`) because this project's
+ * tsconfig enables `erasableSyntaxOnly`, which forbids enum syntax.
+ */
+export const ErrorCode = {
   // Client Errors (4xx)
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-  MALFORMED_JSON = 'MALFORMED_JSON',
-  INVALID_ID = 'INVALID_ID',
-  DUPLICATE_KEY = 'DUPLICATE_KEY',
-  AUTHENTICATION_ERROR = 'AUTHENTICATION_ERROR',
-  AUTHORIZATION_ERROR = 'AUTHORIZATION_ERROR',
-  NOT_FOUND = 'NOT_FOUND',
-  BUSINESS_ERROR = 'BUSINESS_ERROR',
-  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
+  VALIDATION_ERROR: 'VALIDATION_ERROR',
+  MALFORMED_JSON: 'MALFORMED_JSON',
+  INVALID_ID: 'INVALID_ID',
+  DUPLICATE_KEY: 'DUPLICATE_KEY',
+  AUTHENTICATION_ERROR: 'AUTHENTICATION_ERROR',
+  AUTHORIZATION_ERROR: 'AUTHORIZATION_ERROR',
+  NOT_FOUND: 'NOT_FOUND',
+  BUSINESS_ERROR: 'BUSINESS_ERROR',
+  RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
 
   // Server Errors (5xx)
-  DATABASE_ERROR = 'DATABASE_ERROR',
-  EXTERNAL_SERVICE_ERROR = 'EXTERNAL_SERVICE_ERROR',
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
+  DATABASE_ERROR: 'DATABASE_ERROR',
+  EXTERNAL_SERVICE_ERROR: 'EXTERNAL_SERVICE_ERROR',
+  INTERNAL_ERROR: 'INTERNAL_ERROR',
 
   // Client-side errors
-  NETWORK_ERROR = 'NETWORK_ERROR',
-  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
-  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
-}
+  NETWORK_ERROR: 'NETWORK_ERROR',
+  TIMEOUT_ERROR: 'TIMEOUT_ERROR',
+  UNKNOWN_ERROR: 'UNKNOWN_ERROR',
+} as const;
+
+export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 /**
  * Structured error class for frontend
@@ -75,8 +89,12 @@ export class AppError extends Error {
     this.context = context;
     this.isRetryable = isRetryable;
 
-    // Maintains proper stack trace for where error was thrown
-    Error.captureStackTrace(this, this.constructor);
+    // Maintains proper stack trace for where error was thrown (V8 only).
+    // Guarded because the DOM lib types don't declare captureStackTrace.
+    const ErrorCtor = Error as unknown as {
+      captureStackTrace?: (target: object, ctor?: Function) => void;
+    };
+    ErrorCtor.captureStackTrace?.(this, this.constructor);
   }
 
   /**

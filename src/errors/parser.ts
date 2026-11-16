@@ -1,5 +1,6 @@
-import axios, { AxiosError } from 'axios';
-import { AppError, ApiErrorResponse, ErrorCode } from './types';
+import axios, { type AxiosError } from 'axios';
+import { AppError, ErrorCode } from './types';
+import type { ApiErrorResponse, LegacyErrorResponse } from './types';
 
 /**
  * Parse API error response and create structured AppError
@@ -7,7 +8,7 @@ import { AppError, ApiErrorResponse, ErrorCode } from './types';
 export function parseApiError(error: unknown): AppError {
   // Handle Axios errors
   if (axios.isAxiosError(error)) {
-    const axiosError = error as AxiosError<ApiErrorResponse>;
+    const axiosError = error as AxiosError<ApiErrorResponse | LegacyErrorResponse>;
 
     // Network error (no response from server)
     if (!axiosError.response) {
@@ -34,24 +35,24 @@ export function parseApiError(error: unknown): AppError {
       });
     }
 
-    // Server responded with error
     const response = axiosError.response;
     const data = response.data;
 
     // Structured error from backend
-    if (data && !data.success && data.error) {
+    if (data && 'error' in data && data.error) {
+      const structured = data as ApiErrorResponse;
       return new AppError({
-        message: data.error.message,
-        code: (data.error.code as ErrorCode) || ErrorCode.UNKNOWN_ERROR,
+        message: structured.error.message,
+        code: (structured.error.code as ErrorCode) || ErrorCode.UNKNOWN_ERROR,
         statusCode: response.status,
-        correlationId: data.error.correlationId,
-        context: data.error.context,
+        correlationId: structured.error.correlationId,
+        context: structured.error.context,
         isRetryable: response.status >= 500 && response.status < 600,
       });
     }
 
     // Legacy error format
-    if (data && data.message) {
+    if (data && 'message' in data && typeof data.message === 'string') {
       return new AppError({
         message: data.message,
         code: mapStatusToErrorCode(response.status),
@@ -94,26 +95,17 @@ export function parseApiError(error: unknown): AppError {
  */
 function mapStatusToErrorCode(status: number): ErrorCode {
   switch (status) {
-    case 400:
-      return ErrorCode.VALIDATION_ERROR;
-    case 401:
-      return ErrorCode.AUTHENTICATION_ERROR;
-    case 403:
-      return ErrorCode.AUTHORIZATION_ERROR;
-    case 404:
-      return ErrorCode.NOT_FOUND;
-    case 422:
-      return ErrorCode.BUSINESS_ERROR;
-    case 429:
-      return ErrorCode.RATE_LIMIT_EXCEEDED;
-    case 500:
-      return ErrorCode.INTERNAL_ERROR;
+    case 400: return ErrorCode.VALIDATION_ERROR;
+    case 401: return ErrorCode.AUTHENTICATION_ERROR;
+    case 403: return ErrorCode.AUTHORIZATION_ERROR;
+    case 404: return ErrorCode.NOT_FOUND;
+    case 422: return ErrorCode.BUSINESS_ERROR;
+    case 429: return ErrorCode.RATE_LIMIT_EXCEEDED;
+    case 500: return ErrorCode.INTERNAL_ERROR;
     case 502:
     case 503:
-    case 504:
-      return ErrorCode.EXTERNAL_SERVICE_ERROR;
-    default:
-      return ErrorCode.UNKNOWN_ERROR;
+    case 504: return ErrorCode.EXTERNAL_SERVICE_ERROR;
+    default:  return ErrorCode.UNKNOWN_ERROR;
   }
 }
 
@@ -142,13 +134,6 @@ export function logError(error: AppError, context?: Record<string, any>): void {
   } else {
     // In production, send to error tracking service (Sentry, etc.)
     console.error('[AppError]', JSON.stringify(errorLog));
-
-    // TODO: Send to Sentry when integrated
-    // Sentry.captureException(error, {
-    //   contexts: {
-    //     custom: errorLog,
-    //   },
-    // });
   }
 }
 
@@ -174,19 +159,14 @@ export function getErrorCodeMessage(code: ErrorCode): string {
     [ErrorCode.UNKNOWN_ERROR]: 'An unexpected error occurred.',
   };
 
-  return messages[code] || messages[ErrorCode.UNKNOWN_ERROR];
+  return messages[code] ?? messages[ErrorCode.UNKNOWN_ERROR];
 }
 
 /**
  * Create a validation error
  */
 export function createValidationError(message: string, context?: Record<string, any>): AppError {
-  return new AppError({
-    message,
-    code: ErrorCode.VALIDATION_ERROR,
-    statusCode: 400,
-    context,
-  });
+  return new AppError({ message, code: ErrorCode.VALIDATION_ERROR, statusCode: 400, context });
 }
 
 /**
