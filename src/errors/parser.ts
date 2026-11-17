@@ -123,12 +123,20 @@ export function getErrorMessage(err: unknown, fallback: string = 'An error occur
 }
 
 /**
- * Log error to console (in development only)
- * In production, logging is disabled to prevent exposing sensitive data in client console
+ * Log error to console (in development) or send to error tracking service (in production)
+ *
+ * SECURITY:
+ * - Development: Logs to console for debugging
+ * - Production: Sends to Sentry/error tracking with data sanitization
+ * - Never logs sensitive data (passwords, tokens, request bodies)
+ *
+ * SENTRY INTEGRATION (Future):
+ * When you add Sentry, it will automatically start capturing errors.
+ * See: src/lib/sentry.ts for initialization setup
  */
 export function logError(error: AppError, context?: Record<string, any>): void {
-  // Only log in development - never log to production client console
   if (import.meta.env.DEV) {
+    // Development: log to console for debugging
     const errorLog = {
       ...error.toJSON(),
       additionalContext: context,
@@ -136,11 +144,30 @@ export function logError(error: AppError, context?: Record<string, any>): void {
       url: window.location.href,
     };
     console.error('[AppError]', errorLog);
-  }
+  } else {
+    // Production: send to error tracking service (Sentry)
+    // Check if Sentry is available (will be undefined if not configured)
+    if (typeof window !== 'undefined' && (window as any).Sentry) {
+      const Sentry = (window as any).Sentry;
 
-  // In production: do NOT log to console
-  // If you need production error tracking, integrate a service like Sentry
-  // and send errors server-side only, with proper data sanitization
+      Sentry.captureException(error, {
+        level: 'error',
+        extra: {
+          errorCode: error.code,
+          statusCode: error.statusCode,
+          correlationId: error.correlationId,
+          isRetryable: error.isRetryable,
+          context: error.context,
+          additionalContext: context,
+        },
+        tags: {
+          errorCode: error.code,
+          statusCode: error.statusCode?.toString(),
+        },
+      });
+    }
+    // If Sentry not configured: silently fail, no console logging in production
+  }
 }
 
 /**
