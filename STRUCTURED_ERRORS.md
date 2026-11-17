@@ -241,12 +241,13 @@ Errors from the backend are automatically parsed:
 }
 ```
 
-## Logging
+## Logging & Security
 
-Errors are automatically logged with context:
+### Development Mode
+Errors are logged to console with full context for debugging:
 
 ```typescript
-{
+console.error('[AppError]', {
   "name": "AppError",
   "message": "Email is required",
   "code": "VALIDATION_ERROR",
@@ -257,20 +258,48 @@ Errors are automatically logged with context:
     "field": "email"
   },
   "additionalContext": {
-    "endpoint": "/api/products",
+    "endpoint": "/api/products",  // Query params stripped
     "method": "POST"
-  },
-  "userAgent": "Mozilla/5.0...",
-  "url": "http://localhost:3000/products/new"
-}
+  }
+})
 ```
+
+### Production Mode
+**No console logging** - errors are silent to prevent exposing sensitive data.
+
+When Sentry is configured, errors are sent to Sentry dashboard with sanitization:
+- Query parameters stripped from URLs
+- Request/response bodies excluded
+- Headers (Authorization, cookies) removed
+- Personal data sanitized
+
+### Security Guarantees
+
+❌ **Never logged in production console:**
+- Passwords
+- Authentication tokens (JWT)
+- Request/response bodies
+- HTTP headers (Authorization, cookies)
+- Query parameters (may contain IDs/tokens)
+- Personal data from forms
+
+✅ **What gets logged (Development only):**
+- Error messages and codes
+- HTTP status codes
+- Endpoint paths (without query params)
+- HTTP methods
+- Error context (sanitized)
 
 ## Migration Guide
 
-### Before (Old Style)
+### ✅ Migration Complete!
+
+All components and pages have been migrated to use structured errors.
+
+### Before (Old Style - Deprecated)
 
 ```typescript
-import { getErrorMessage } from '@/api/errors';
+import { getErrorMessage } from '@/api/errors';  // ❌ Deprecated
 
 try {
   await apiClient.post('/api/products', data);
@@ -280,67 +309,83 @@ try {
 }
 ```
 
-### After (New Structured Style)
+### After (Current Style - All files updated)
 
 ```typescript
-import { parseApiError, getErrorMessage } from '@/errors';
+import { getErrorMessage } from '@/errors';  // ✅ New centralized location
 
 try {
   await apiClient.post('/api/products', data);
 } catch (error) {
-  const appError = parseApiError(error);
+  // Simple usage (backward compatible)
+  const message = getErrorMessage(error, 'Failed to create product');
+  alert(message);
   
-  // More control over error handling
+  // Or advanced usage with AppError
+  const appError = parseApiError(error);
   if (appError.isAuthError()) {
     navigate('/login');
   } else {
     alert(appError.getUserMessage());
   }
-  
-  // Or use backward-compatible helper
-  const message = getErrorMessage(error, 'Failed to create product');
-  alert(message);
 }
 ```
 
-## Backward Compatibility
+## Files Migrated
 
-The old `getErrorMessage` function still works:
+✅ **All 16 files updated** (Commit: 20fc0aa):
+- Pages: LoginPage, TeamPage, SettingsPage, ProductsPage, ProductFormPage, OrdersPage, OrderFormPage, CourierPaymentsPage
+- Components: BlockPhoneDialog, CallConfirmedToggle, ChangePasswordDialog, CourierSection, OrderDetailsForm, OrderTimeline, RecordPaymentDialog
+- API: uploads.ts
 
-```typescript
-import { getErrorMessage } from '@/api/errors';
+All now import from `@/errors` instead of deprecated `@/api/errors`.
 
-// Still works exactly the same
-const message = getErrorMessage(error, 'Fallback message');
+## Sentry Integration (Ready)
+
+Sentry integration is **prepared and ready** but not yet installed.
+
+### Current Status
+- ✅ `src/lib/sentry.ts` - Configuration file ready (commented out)
+- ✅ `logError()` - Auto-detects and uses Sentry when available
+- ✅ Security sanitization built-in
+- ⏳ Package not installed yet
+
+### Quick Setup (5 minutes)
+
+```bash
+# 1. Install Sentry
+npm install @sentry/react --legacy-peer-deps
+
+# 2. Get DSN from https://sentry.io
+
+# 3. Add to .env.production
+VITE_SENTRY_DSN=https://xxxxx@o0.ingest.sentry.io/xxxxx
+VITE_APP_VERSION=1.0.0
+
+# 4. Uncomment code in src/lib/sentry.ts
+# Remove the /* */ comments around Sentry.init()
+
+# 5. Build and deploy
+npm run build
 ```
 
-## Future: Sentry Integration
+### What You Get
+- Real-time error tracking in production
+- Stack traces with source maps
+- User context and breadcrumbs
+- Performance monitoring
+- Session replay (optional)
+- Correlation ID tracking
 
-When ready to add Sentry:
+### Security Features
+The Sentry integration includes automatic data sanitization:
+- `beforeSend` hook strips sensitive data
+- Query parameters removed from URLs
+- Request/response bodies excluded
+- Headers sanitized
+- PII scrubbing enabled
 
-```typescript
-// src/errors/parser.ts
-import * as Sentry from '@sentry/react';
-
-export function logError(error: AppError, context?: Record<string, any>): void {
-  const errorLog = {
-    ...error.toJSON(),
-    additionalContext: context,
-  };
-
-  if (import.meta.env.PROD) {
-    Sentry.captureException(error, {
-      tags: {
-        error_code: error.code,
-        correlation_id: error.correlationId,
-      },
-      contexts: {
-        custom: errorLog,
-      },
-    });
-  }
-}
-```
+See `SENTRY_SETUP.md` for complete setup guide.
 
 ## Benefits
 
@@ -348,8 +393,29 @@ export function logError(error: AppError, context?: Record<string, any>): void {
 ✅ **Consistent error structure** across the app  
 ✅ **Rich debugging context** with correlation IDs  
 ✅ **User-friendly error messages**  
-✅ **Automatic error logging**  
+✅ **Automatic error logging** (dev only)  
 ✅ **Easy error type checking**  
-✅ **Backward compatible** with existing code  
-✅ **Ready for Sentry** integration  
-✅ **Retry detection** for network errors
+✅ **Migration complete** - all 16 files updated  
+✅ **Sentry ready** - 5-minute setup when needed  
+✅ **Retry detection** for network errors  
+✅ **Production-safe** - no sensitive data logged  
+✅ **Security-first design** - data sanitization built-in
+
+## Implementation Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Core error system | ✅ Complete | AppError, ErrorCode, parser |
+| API client integration | ✅ Complete | Auto-parses all errors |
+| Component migration | ✅ Complete | All 16 files updated |
+| Security hardening | ✅ Complete | No prod console logging |
+| Sentry preparation | ✅ Ready | 5-min setup when needed |
+| Documentation | ✅ Complete | This doc + SENTRY_SETUP.md |
+
+## Version History
+
+- **v1.0** - Initial structured error system (Commit: 4056d3f)
+- **v1.1** - TypeScript fixes (Commit: 84959ed)
+- **v2.0** - Complete migration (Commit: 20fc0aa) - 16 files updated
+- **v2.1** - Security hardening (Commit: 7b4eb02) - Production-safe
+- **v2.2** - Sentry preparation (Commit: 9a65f06) - Ready for tracking
