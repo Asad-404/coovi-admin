@@ -24,9 +24,10 @@ apiClient.interceptors.response.use(
     // Parse error into structured format
     const appError = parseApiError(error)
 
-    // Log error with context
+    // Log error with minimal context (never log request/response bodies)
+    // Only endpoint and method - no query params, headers, or body data
     logError(appError, {
-      endpoint: error.config?.url,
+      endpoint: error.config?.url?.split('?')[0], // Remove query params
       method: error.config?.method,
     })
 

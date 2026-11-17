@@ -1,6 +1,6 @@
 import axios from 'axios'
 import apiClient from './client.ts'
-import { getErrorMessage } from './errors.ts'
+import { getErrorMessage } from '@/errors'
 
 // Cloudinary's free plan rejects images above 10 MB
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024

@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material'
 import { authApi } from '@/api/auth'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import { hasUsableToken, setToken } from '@/utils/auth'
 
 export default function LoginPage() {

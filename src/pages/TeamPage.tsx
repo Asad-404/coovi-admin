@@ -29,7 +29,7 @@ import {
 import PersonAddIcon from '@mui/icons-material/PersonAdd'
 import { adminsApi } from '@/api/admins'
 import type { TeamMemberUpdate } from '@/api/admins'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import { useNotify } from '@/notify/context'
 import AddFab from '@/components/phone/AddFab'
 import PageHeader from '@/components/phone/PageHeader'
