@@ -16,7 +16,7 @@ import {
   Typography,
 } from '@mui/material'
 import PageHeader from '@/components/phone/PageHeader'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import { settingsApi } from '@/api/settings'
 import type { SettingsUpdate } from '@/api/settings'
 import { useNotify } from '@/notify/context'

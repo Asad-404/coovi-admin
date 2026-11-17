@@ -19,7 +19,7 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { courierPaymentsApi } from '@/api/courierPayments'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import { useIsPhone } from '@/hooks/useIsPhone'
 import { useNotify } from '@/notify/context'
 import { formatPrice } from '@/utils/format'

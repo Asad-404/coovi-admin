@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, TextField, Typography } from '@mui/material'
 import { customersApi } from '@/api/customers'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import { ORDERS_KEY } from '@/hooks/useOrders'
 import { useNotify } from '@/notify/context'
 

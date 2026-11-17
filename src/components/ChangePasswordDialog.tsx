@@ -14,7 +14,7 @@ import {
 } from '@mui/material'
 import { authApi } from '@/api/auth'
 import { setToken } from '@/utils/auth'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 
 interface ChangePasswordDialogProps {
   open: boolean

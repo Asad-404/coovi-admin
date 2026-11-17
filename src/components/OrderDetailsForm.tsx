@@ -14,7 +14,7 @@ import {
   Typography,
 } from '@mui/material'
 import { ordersApi } from '@/api/orders'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import { useNotify } from '@/notify/context'
 import type { DeliveryArea, Order, OrderDetailsUpdate } from '@/types'
 import { areaForDistrict, orderArea } from '@/utils/deliveryArea'

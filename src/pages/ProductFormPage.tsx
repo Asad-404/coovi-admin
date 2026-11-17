@@ -33,7 +33,7 @@ import StarBorderIcon from '@mui/icons-material/StarBorder'
 import StickyActions from '@/components/phone/StickyActions'
 import { useIsPhone } from '@/hooks/useIsPhone'
 import { productsApi } from '@/api/products'
-import { getErrorMessage } from '@/api/errors'
+import { getErrorMessage } from '@/errors'
 import {
   appendImageUrls,
   checkImageFile,
