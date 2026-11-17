@@ -4,6 +4,7 @@ import type { ApiErrorResponse, LegacyErrorResponse } from './types';
 
 /**
  * Parse API error response and create structured AppError
+ * SECURITY: Does not include request/response bodies to avoid logging sensitive data
  */
 export function parseApiError(error: unknown): AppError {
   // Handle Axios errors
@@ -18,7 +19,8 @@ export function parseApiError(error: unknown): AppError {
           code: ErrorCode.TIMEOUT_ERROR,
           isRetryable: true,
           context: {
-            url: axiosError.config?.url,
+            // Only store endpoint path, not query params or body
+            url: axiosError.config?.url?.split('?')[0],
             method: axiosError.config?.method,
           },
         });
@@ -29,7 +31,8 @@ export function parseApiError(error: unknown): AppError {
         code: ErrorCode.NETWORK_ERROR,
         isRetryable: true,
         context: {
-          url: axiosError.config?.url,
+          // Only store endpoint path, not query params or body
+          url: axiosError.config?.url?.split('?')[0],
           method: axiosError.config?.method,
         },
       });
@@ -46,6 +49,7 @@ export function parseApiError(error: unknown): AppError {
         code: (structured.error.code as ErrorCode) || ErrorCode.UNKNOWN_ERROR,
         statusCode: response.status,
         correlationId: structured.error.correlationId,
+        // Backend context should be safe, but we trust the backend to not send sensitive data
         context: structured.error.context,
         isRetryable: response.status >= 500 && response.status < 600,
       });
@@ -119,22 +123,24 @@ export function getErrorMessage(err: unknown, fallback: string = 'An error occur
 }
 
 /**
- * Log error to console (in development) or error tracking service (in production)
+ * Log error to console (in development only)
+ * In production, logging is disabled to prevent exposing sensitive data in client console
  */
 export function logError(error: AppError, context?: Record<string, any>): void {
-  const errorLog = {
-    ...error.toJSON(),
-    additionalContext: context,
-    userAgent: navigator.userAgent,
-    url: window.location.href,
-  };
-
+  // Only log in development - never log to production client console
   if (import.meta.env.DEV) {
+    const errorLog = {
+      ...error.toJSON(),
+      additionalContext: context,
+      userAgent: navigator.userAgent,
+      url: window.location.href,
+    };
     console.error('[AppError]', errorLog);
-  } else {
-    // In production, send to error tracking service (Sentry, etc.)
-    console.error('[AppError]', JSON.stringify(errorLog));
   }
+
+  // In production: do NOT log to console
+  // If you need production error tracking, integrate a service like Sentry
+  // and send errors server-side only, with proper data sanitization
 }
 
 /**
